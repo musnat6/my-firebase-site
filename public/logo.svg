@@ -1,11 +1,7 @@
-<svg width="32" height="32" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:hsl(var(--primary));stop-opacity:1" />
-      <stop offset="100%" style="stop-color:hsl(var(--accent));stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <path d="M50 0 L100 25 L100 75 L50 100 L0 75 L0 25 Z" fill="url(#logoGradient)" />
-  <path d="M50 10 L90 30 L90 70 L50 90 L10 70 L10 30 Z" fill="hsl(var(--background))" />
-  <text x="50" y="62" font-family="Space Grotesk, sans-serif" font-size="30" font-weight="bold" fill="url(#logoGradient)" text-anchor="middle">A</text>
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="100" height="100" rx="20" fill="#4285F4"/>
+<path d="M50 15L62.5 37.5H37.5L50 15Z" fill="#FFCA28"/>
+<path d="M25 85L37.5 62.5H62.5L75 85H25Z" fill="white"/>
+<path d="M25 43.75L37.5 62.5H25V43.75Z" fill="#E3F2FD"/>
+<path d="M75 43.75L62.5 62.5H75V43.75Z" fill="#E3F2FD"/>
 </svg>

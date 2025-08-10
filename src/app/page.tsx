@@ -1,3 +1,8 @@
+
+'use client';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
 import Image from 'next/image';
 import {
   Banknote,
@@ -52,12 +57,29 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { mockUser, mockMatches, mockLeaderboard } from '@/lib/data';
+import { mockMatches, mockLeaderboard } from '@/lib/data';
 import { MatchCard } from '@/components/match-card';
 import { UserNav } from '@/components/user-nav';
+import { useToast } from '@/hooks/use-toast';
 
 export default function DashboardPage() {
-  const user = mockUser;
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
+  if (loading || !user) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   const opponentSuggestions = [
     {
@@ -89,7 +111,7 @@ export default function DashboardPage() {
         <Sidebar>
           <SidebarHeader>
             <div className="flex items-center gap-3">
-              <Image src="/logo.svg" alt="Arena Clash" width={32} height={32} data-ai-hint="logo" />
+              <Image src="/logo.svg" alt="Arena Clash" width={32} height={32} data-ai-hint="logo"/>
               <h1 className="text-xl font-headline font-bold">Arena Clash</h1>
             </div>
           </SidebarHeader>

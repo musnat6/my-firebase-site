@@ -36,3 +36,22 @@ export interface LeaderboardEntry {
   wins: number;
   losses: number;
 }
+
+export interface Deposit {
+  depositId: string;
+  userId: string;
+  amount: number;
+  transactionId: string;
+  senderNumber: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: number;
+}
+
+export interface Withdrawal {
+  withdrawalId: string;
+  userId: string;
+  amount: number;
+  withdrawalNumber: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: number;
+}

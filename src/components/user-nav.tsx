@@ -12,10 +12,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { CreditCard, LogOut, Settings, User as UserIcon } from "lucide-react"
-import { mockUser } from "@/lib/data"
+import { useAuth } from "@/hooks/use-auth"
+import Link from "next/link"
 
 export function UserNav() {
-  const user = mockUser;
+  const { user, signOut } = useAuth();
+
+  if (!user) {
+    return (
+      <Link href="/login" passHref>
+        <Button variant="outline">Login</Button>
+      </Link>
+    )
+  }
 
   return (
     <DropdownMenu>
@@ -52,7 +61,7 @@ export function UserNav() {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={signOut}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>
