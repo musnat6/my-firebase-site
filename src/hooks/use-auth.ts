@@ -93,7 +93,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       stats: { wins: 0, losses: 0, earnings: 0 },
     };
     await setDoc(doc(db, 'users', newUser.uid), newUser);
-    // onAuthStateChanged will handle setting the user state
   };
 
   const signInWithEmail = async (email: string, password: string) => {
@@ -103,14 +102,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     await signInWithPopup(auth, provider);
-    // onAuthStateChanged will handle creating the user doc if it doesn't exist
   };
 
   const signOut = async () => {
     await firebaseSignOut(auth);
   };
 
-  const value: AuthContextType = {
+  const value = {
     user,
     loading,
     signUpWithEmail,
