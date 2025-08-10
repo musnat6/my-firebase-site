@@ -25,11 +25,11 @@ import {
   getFirestore,
   Firestore,
   setDoc,
+  onSnapshot,
 } from 'firebase/firestore';
 
 import { app } from '@/lib/firebase';
 import type { User } from '@/types';
-import { mockUser } from '@/lib/data';
 
 interface AuthContextType {
   user: User | null;
@@ -49,33 +49,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const db: Firestore = getFirestore(app);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const authUnsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          setUser({ uid: firebaseUser.uid, ...userDoc.data() } as User);
-        } else {
-          // If user exists in auth but not firestore, create them
-           const newUser: User = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email!,
-            username: firebaseUser.displayName || 'New User',
-            profilePic: firebaseUser.photoURL || `https://placehold.co/100x100`,
-            balance: 0,
-            role: 'player',
-            stats: { wins: 0, losses: 0, earnings: 0 },
-          };
-          await setDoc(userDocRef, newUser);
-          setUser(newUser);
-        }
+        
+        const userUnsubscribe = onSnapshot(userDocRef, async (userDoc) => {
+          if (userDoc.exists()) {
+            setUser({ uid: firebaseUser.uid, ...userDoc.data() } as User);
+          } else {
+            // If user exists in auth but not firestore, create them
+             const newUser: User = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email!,
+              username: firebaseUser.displayName || 'New User',
+              profilePic: firebaseUser.photoURL || `https://placehold.co/100x100`,
+              balance: 0,
+              role: 'player',
+              stats: { wins: 0, losses: 0, earnings: 0 },
+            };
+            await setDoc(userDocRef, newUser);
+            // Firestore listener will pick up the new user doc and set state
+          }
+          setLoading(false);
+        });
+
+        return () => userUnsubscribe();
+
       } else {
         setUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => authUnsubscribe();
   }, [auth, db]);
 
   const signUpWithEmail = async (email: string, password: string, username: string) => {
@@ -91,7 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       stats: { wins: 0, losses: 0, earnings: 0 },
     };
     await setDoc(doc(db, "users", firebaseUser.uid), newUser);
-    setUser(newUser);
+    // setUser is handled by the onSnapshot listener
   };
 
   const signInWithEmail = async (email: string, password: string) => {
@@ -117,8 +123,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         stats: { wins: 0, losses: 0, earnings: 0 },
       };
       await setDoc(userDocRef, newUser);
-      setUser(newUser);
     }
+    // setUser is handled by the onSnapshot listener
   };
 
   const signOut = async () => {
