@@ -144,21 +144,22 @@ export default function DashboardPage() {
 
     try {
         if (openDialog === 'deposit') {
-            if (!depositScreenshot) {
-                toast({ title: "Screenshot required", description: "Please upload a screenshot.", variant: "destructive" });
-                setIsSubmitting(false);
-                return;
-            }
-            const storage = getStorage();
-            const screenshotRef = ref(storage, `deposits/${user.uid}/${Date.now()}_${depositScreenshot.name}`);
-            const uploadResult = await uploadBytes(screenshotRef, depositScreenshot);
-            const screenshotUrl = await getDownloadURL(uploadResult.ref);
+            // Temporarily disable screenshot upload to fix hanging issue
+            // if (!depositScreenshot) {
+            //     toast({ title: "Screenshot required", description: "Please upload a screenshot.", variant: "destructive" });
+            //     setIsSubmitting(false);
+            //     return;
+            // }
+            // const storage = getStorage();
+            // const screenshotRef = ref(storage, `deposits/${user.uid}/${Date.now()}_${depositScreenshot.name}`);
+            // const uploadResult = await uploadBytes(screenshotRef, depositScreenshot);
+            // const screenshotUrl = await getDownloadURL(uploadResult.ref);
 
             await addDoc(collection(db, 'deposits'), {
                 userId: user.uid,
                 amount: Number(depositAmount),
                 txId: depositTxId,
-                screenshotUrl: screenshotUrl,
+                screenshotUrl: "disabled_for_now", // screenshotUrl,
                 status: 'pending',
                 timestamp: Date.now(),
             });
@@ -455,8 +456,8 @@ export default function DashboardPage() {
                             <Input id="trxId" placeholder="e.g., 9C7B8A1D2E" required value={depositTxId} onChange={(e) => setDepositTxId(e.target.value)} />
                         </div>
                          <div className="grid gap-2">
-                            <Label htmlFor="screenshot">Screenshot</Label>
-                            <Input id="screenshot" type="file" required onChange={(e) => setDepositScreenshot(e.target.files ? e.target.files[0] : null)} />
+                            <Label htmlFor="screenshot">Screenshot (Optional for now)</Label>
+                            <Input id="screenshot" type="file" onChange={(e) => setDepositScreenshot(e.target.files ? e.target.files[0] : null)} />
                         </div>
                         </>
                     )}
