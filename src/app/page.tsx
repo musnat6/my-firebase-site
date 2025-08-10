@@ -210,25 +210,25 @@ export default function DashboardPage() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton disabled>
+                <SidebarMenuButton>
                   <Swords />
                   <span>Matches</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton disabled>
+                <SidebarMenuButton>
                   <Trophy />
                   <span>Leaderboard</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton disabled>
+                <SidebarMenuButton>
                   <Wallet />
                   <span>Wallet</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton disabled>
+                <SidebarMenuButton>
                   <ShieldQuestion />
                   <span>Disputes</span>
                 </SidebarMenuButton>
