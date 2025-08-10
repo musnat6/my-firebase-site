@@ -20,28 +20,25 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import type { User } from '@/types';
+import { User } from '@/types';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signUpWithEmail: (email: string, password: string, username: string) => Promise<void>;
-  signInWithEmail: (email: string, password: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
-  signOut: () => Promise<void>;
+  signUpWithEmail(email: string, password: string, username: string): Promise<void>;
+  signInWithEmail(email: string, password: string): Promise<void>;
+  signInWithGoogle(): Promise<void>;
+  signOut(): Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true,
-  signUpWithEmail: async () => {},
-  signInWithEmail: async () => {},
-  signInWithGoogle: async () => {},
-  signOut: async () => {},
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function useAuth() {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -56,13 +53,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (userDoc.exists()) {
           setUser(userDoc.data() as User);
         } else {
-          // This case might happen if user signed up but doc creation failed
-          // Or for Google sign-in on first login
+          // If the user signed up with Google, their displayName and photoURL might be available
+          const displayName = firebaseUser.displayName || 'New User';
+          const photoURL = firebaseUser.photoURL || `https://placehold.co/100x100`;
+
           const newUser: User = {
             uid: firebaseUser.uid,
             email: firebaseUser.email!,
-            username: firebaseUser.displayName || 'New User',
-            profilePic: firebaseUser.photoURL || `https://placehold.co/100x100`,
+            username: displayName,
+            profilePic: photoURL,
             balance: 0,
             role: 'player',
             stats: { wins: 0, losses: 0, earnings: 0 },
@@ -81,19 +80,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUpWithEmail = async (email: string, password: string, username: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(userCredential.user, { displayName: username, photoURL: `https://placehold.co/100x100` });
+    const photoURL = `https://placehold.co/100x100`;
+    await updateProfile(userCredential.user, { displayName: username, photoURL: photoURL });
 
     const newUser: User = {
       uid: userCredential.user.uid,
       email: userCredential.user.email!,
       username: username,
-      profilePic: userCredential.user.photoURL!,
+      profilePic: photoURL,
       balance: 0,
       role: 'player',
       stats: { wins: 0, losses: 0, earnings: 0 },
     };
     await setDoc(doc(db, 'users', newUser.uid), newUser);
-    setUser(newUser);
+    // onAuthStateChanged will handle setting the user state
   };
 
   const signInWithEmail = async (email: string, password: string) => {
@@ -103,13 +103,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     await signInWithPopup(auth, provider);
+    // onAuthStateChanged will handle creating the user doc if it doesn't exist
   };
 
   const signOut = async () => {
     await firebaseSignOut(auth);
   };
 
-  const value = {
+  const value: AuthContextType = {
     user,
     loading,
     signUpWithEmail,
