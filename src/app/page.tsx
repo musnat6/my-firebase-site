@@ -90,6 +90,7 @@ export default function DashboardPage() {
   const [entryFee, setEntryFee] = useState('');
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
   const [withdrawError, setWithdrawError] = useState('');
+  const [createMatchError, setCreateMatchError] = useState('');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -123,6 +124,19 @@ export default function DashboardPage() {
       setWithdrawError('');
     }
   }, [withdrawAmount, user]);
+
+  useEffect(() => {
+    if (user && entryFee) {
+      const fee = Number(entryFee);
+      if (fee > user.balance) {
+        setCreateMatchError(`Entry fee cannot exceed your balance of ${user.balance}৳.`);
+      } else {
+        setCreateMatchError('');
+      }
+    } else {
+      setCreateMatchError('');
+    }
+  }, [entryFee, user]);
   
   const handleGenerateDescription = async () => {
     if (!entryFee) {
@@ -185,13 +199,14 @@ export default function DashboardPage() {
     setMatchTitle('');
     setMatchDescription('');
     setEntryFee('');
+    setCreateMatchError('');
     setOpponentSuggestions([]);
     setHasCopied(false);
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || (openDialog === 'withdraw' && withdrawError)) return;
+    if (!user || (openDialog === 'withdraw' && withdrawError) || (openDialog === 'createMatch' && createMatchError)) return;
     setIsSubmitting(true);
 
     try {
@@ -235,10 +250,15 @@ export default function DashboardPage() {
         });
 
       } else if (openDialog === 'createMatch') {
+        const entryFeeNumber = Number(entryFee);
+        if (entryFeeNumber > user.balance) {
+            throw new Error('Entry fee cannot exceed your balance.');
+        }
+
         await addDoc(collection(db, 'matches'), {
           title: matchTitle,
           description: matchDescription,
-          entryFee: Number(entryFee),
+          entryFee: entryFeeNumber,
           type: '1v1',
           status: 'open',
           players: [{ uid: user.uid, username: user.username, profilePic: user.profilePic }],
@@ -524,6 +544,7 @@ export default function DashboardPage() {
                         <div className="grid gap-2">
                             <Label htmlFor="entry-fee">Entry Fee (minimum 50৳)</Label>
                             <Input id="entry-fee" placeholder="50" type="number" min="50" required value={entryFee} onChange={(e) => setEntryFee(e.target.value)} />
+                            {createMatchError && <p className="text-sm text-red-600">{createMatchError}</p>}
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="description">Match Description</Label>
@@ -568,7 +589,7 @@ export default function DashboardPage() {
                      <DialogFooter>
                         <Button variant="outline" onClick={closeDialog} type="button">Cancel</Button>
                          {openDialog !== 'suggestOpponents' ? (
-                            <Button type="submit" disabled={isSubmitting || !!withdrawError}>
+                            <Button type="submit" disabled={isSubmitting || !!withdrawError || !!createMatchError}>
                                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 {openDialog === 'createMatch' ? 'Create Match' : 'Submit for Approval'}
                             </Button>
