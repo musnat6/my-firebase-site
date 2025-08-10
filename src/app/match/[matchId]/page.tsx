@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db } from '@/lib/firebase';
 import type { Match, User, ResultSubmission, PlayerRef } from '@/types';
@@ -59,7 +59,6 @@ function ResultSubmissionCard({
                 submittedBy: player.uid,
                 screenshotUrl,
                 submittedAt: Date.now(),
-                confirmedByOpponent: false
             };
             
             const matchRef = doc(db, 'matches', match.matchId);
@@ -187,8 +186,7 @@ export default function MatchDetailPage() {
   
   const userIsInMatch = match.players.some(p => p.uid === user.uid);
   const isMatchInProgress = match.status === 'inprogress';
-  const [player1, player2] = match.players;
-
+  
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6">
@@ -212,13 +210,13 @@ export default function MatchDetailPage() {
                 <CardContent>
                      <div className="flex items-center justify-around">
                         {match.players.map((p, index) => (
-                           <div key={p.uid} className="flex flex-col items-center gap-2">
+                           <div key={p.uid} className="flex flex-col items-center gap-2 relative">
                                 <Avatar className="h-20 w-20 border-4 border-primary/20">
                                     <AvatarImage src={p.profilePic} alt={p.username} />
                                     <AvatarFallback>{p.username ? p.username.charAt(0) : 'P'}</AvatarFallback>
                                 </Avatar>
                                 <span className="font-bold text-lg">{p.username || 'Player'}</span>
-                                { (index === 0 && match.players.length > 1) && <Swords className="h-12 w-12 text-muted-foreground absolute" />}
+                                { index === 0 && match.players.length > 1 && <Swords className="h-12 w-12 text-muted-foreground absolute top-1/2 left-full transform -translate-y-1/2 translate-x-4 z-10" />}
                             </div>
                         ))}
                          {match.players.length === 1 && (
@@ -249,3 +247,5 @@ export default function MatchDetailPage() {
     </div>
   );
 }
+
+    

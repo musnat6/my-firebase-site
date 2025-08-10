@@ -193,11 +193,11 @@ export default function AdminPage() {
                 const userDoc = await transaction.get(userRef);
                 if (!userDoc.exists()) throw new Error("User not found!");
                 
-                // Balance is now correctly handled in the withdrawal request dialog.
-                // Re-checking here is good practice for security.
                 const currentBalance = userDoc.data().balance || 0;
                 if (currentBalance < withdrawal.amount) throw new Error("User has insufficient funds.");
+                const newBalance = currentBalance - withdrawal.amount;
 
+                transaction.update(userRef, { balance: newBalance });
                 transaction.update(withdrawalRef, { status: newStatus, handledBy: user?.uid });
             });
             toast({ title: 'Withdrawal Approved', description: 'User balance deducted. Send payment manually.', className: 'bg-green-600 text-white' });
@@ -503,3 +503,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    

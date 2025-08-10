@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -21,6 +22,7 @@ import {
   Trophy,
   Copy,
   Check,
+  Gavel,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -56,14 +58,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { addDoc, collection, doc, onSnapshot } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { LeaderboardTable } from '@/components/leaderboard-table';
 import { useUserMatches } from '@/hooks/use-user-matches';
 import { suggestOpponents, SuggestOpponentsOutput } from '@/ai/flows/suggest-opponents';
 import { generateMatchDescription } from '@/ai/flows/generate-match-description';
 import { Textarea } from '@/components/ui/textarea';
-import type { PaymentSettings } from '@/types';
+import type { PaymentSettings, User } from '@/types';
 
 
 export default function DashboardPage() {
@@ -199,24 +201,39 @@ export default function DashboardPage() {
           username: user.username,
           amount: Number(depositAmount),
           txId: depositTxId,
-          screenshotUrl: 'disabled_for_now',
           status: 'pending',
           timestamp: Date.now(),
         });
       } else if (openDialog === 'withdraw') {
-        if (Number(withdrawAmount) > user.balance) {
+        const amountToWithdraw = Number(withdrawAmount);
+        if (amountToWithdraw > user.balance) {
           toast({ title: 'Error', description: 'Insufficient balance.', variant: 'destructive' });
           setIsSubmitting(false);
           return;
         }
-        await addDoc(collection(db, 'withdrawals'), {
-          userId: user.uid,
-          username: user.username,
-          amount: Number(withdrawAmount),
-          bkashNumber: withdrawBkash,
-          status: 'pending',
-          timestamp: Date.now(),
+        
+        const userRef = doc(db, 'users', user.uid);
+        await runTransaction(db, async (transaction) => {
+            const userDoc = await transaction.get(userRef);
+            if (!userDoc.exists()) throw new Error("User not found!");
+
+            const currentBalance = userDoc.data().balance || 0;
+            if(currentBalance < amountToWithdraw) throw new Error("Insufficient funds.");
+            
+            const newBalance = currentBalance - amountToWithdraw;
+            transaction.update(userRef, { balance: newBalance });
+            
+            const withdrawalRef = collection(db, 'withdrawals');
+            transaction.set(doc(withdrawalRef), {
+                userId: user.uid,
+                username: user.username,
+                amount: amountToWithdraw,
+                bkashNumber: withdrawBkash,
+                status: 'pending',
+                timestamp: Date.now(),
+            });
         });
+
       } else if (openDialog === 'createMatch') {
         await addDoc(collection(db, 'matches'), {
           title: matchTitle,
@@ -292,6 +309,12 @@ export default function DashboardPage() {
                 <SidebarMenuButton onClick={() => navigate('wallet')} tooltip="My Wallet">
                   <Wallet />
                   <span>Wallet</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+               <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => navigate('rules')} tooltip="Rules & System">
+                  <Gavel />
+                  <span>Rules & System</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               {user.role === 'admin' && (
@@ -563,3 +586,5 @@ export default function DashboardPage() {
     </SidebarProvider>
   );
 }
+
+    

@@ -1,5 +1,4 @@
 
-
 export interface PlayerRef {
     uid: string;
     username: string;
@@ -24,7 +23,6 @@ export interface ResultSubmission {
   submittedBy: string; // uid of the player who submitted
   screenshotUrl: string;
   submittedAt: number;
-  confirmedByOpponent: boolean;
 }
 
 export interface Match {
@@ -61,7 +59,6 @@ export interface Deposit {
   username: string;
   amount: number;
   txId: string;
-  screenshotUrl: string;
   status: 'pending' | 'approved' | 'declined';
   timestamp: number;
   handledBy?: string;
@@ -81,3 +78,5 @@ export interface Withdrawal {
 export interface PaymentSettings {
   number: string;
 }
+
+    
