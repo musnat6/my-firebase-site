@@ -66,7 +66,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { addDoc, collection, serverTimestamp, getFirestore } from 'firebase/firestore';
-import { db as firestoreDB } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function DashboardPage() {
@@ -141,7 +141,6 @@ export default function DashboardPage() {
     e.preventDefault();
     if (!user) return;
     setIsSubmitting(true);
-    const db = getFirestore();
 
     try {
         if (openDialog === 'deposit') {
