@@ -28,22 +28,20 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, CheckCircle, Clock } from 'lucide-react';
-
-// Mock data - replace with Firestore data
-const mockDeposits = [
-    { depositId: 'dep1', userId: 'user1', amount: 500, txId: '8N3J4K5L6M', status: 'pending' },
-    { depositId: 'dep2', userId: 'user2', amount: 100, txId: '9P7Q8R1S2T', status: 'approved' },
-];
-
-const mockWithdrawals = [
-    { withdrawalId: 'wd1', userId: 'user3', amount: 1000, bkashNumber: '01xxxxxxxxx', status: 'pending' },
-    { withdrawalId: 'wd2', userId: 'user4', amount: 200, bkashNumber: '01xxxxxxxxx', status: 'declined' },
-];
+import { collection, onSnapshot, doc, updateDoc, runTransaction, getFirestore } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { Deposit, Withdrawal } from '@/types';
+import { useToast } from '@/hooks/use-toast';
+import { DisputeSummarizer } from '@/components/dispute-summarizer';
 
 
 export default function AdminPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
+  const [deposits, setDeposits] = useState<Deposit[]>([]);
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!loading) {
@@ -54,6 +52,87 @@ export default function AdminPage() {
       }
     }
   }, [user, loading, router]);
+  
+  useEffect(() => {
+    if (user && user.role === 'admin') {
+      const depositsUnsub = onSnapshot(collection(db, 'deposits'), (snapshot) => {
+        setDeposits(snapshot.docs.map(doc => ({ depositId: doc.id, ...doc.data() } as Deposit)));
+      });
+
+      const withdrawalsUnsub = onSnapshot(collection(db, 'withdrawals'), (snapshot) => {
+        setWithdrawals(snapshot.docs.map(doc => ({ withdrawalId: doc.id, ...doc.data() } as Withdrawal)));
+      });
+
+      return () => {
+        depositsUnsub();
+        withdrawalsUnsub();
+      };
+    }
+  }, [user]);
+
+  const handleDepositAction = async (depositId: string, newStatus: 'approved' | 'declined') => {
+    setIsSubmitting(prev => ({ ...prev, [depositId]: true }));
+    const depositRef = doc(db, 'deposits', depositId);
+    const deposit = deposits.find(d => d.depositId === depositId);
+    if (!deposit) return;
+
+    try {
+      if (newStatus === 'approved') {
+        const userRef = doc(db, 'users', deposit.userId);
+        await runTransaction(db, async (transaction) => {
+          const userDoc = await transaction.get(userRef);
+          if (!userDoc.exists()) {
+            throw new Error("User does not exist!");
+          }
+          const newBalance = (userDoc.data().balance || 0) + deposit.amount;
+          transaction.update(userRef, { balance: newBalance });
+          transaction.update(depositRef, { status: newStatus });
+        });
+        toast({ title: 'Deposit Approved', description: `User balance updated successfully.` });
+      } else {
+        await updateDoc(depositRef, { status: newStatus });
+        toast({ title: 'Deposit Declined', variant: 'destructive' });
+      }
+    } catch (error) {
+      console.error("Error processing deposit: ", error);
+      toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' });
+    } finally {
+        setIsSubmitting(prev => ({ ...prev, [depositId]: false }));
+    }
+  };
+
+  const handleWithdrawalAction = async (withdrawalId: string, newStatus: 'approved' | 'declined') => {
+    setIsSubmitting(prev => ({ ...prev, [withdrawalId]: true }));
+    const withdrawalRef = doc(db, 'withdrawals', withdrawalId);
+    const withdrawal = withdrawals.find(w => w.withdrawalId === withdrawalId);
+    if (!withdrawal) return;
+
+    try {
+        if (newStatus === 'approved') {
+             await updateDoc(withdrawalRef, { status: newStatus });
+             toast({ title: 'Withdrawal Approved', description: 'Remember to send the payment manually.' });
+        } else {
+            // If declined, refund the amount to the user's balance.
+            const userRef = doc(db, 'users', withdrawal.userId);
+             await runTransaction(db, async (transaction) => {
+                const userDoc = await transaction.get(userRef);
+                if (!userDoc.exists()) {
+                    throw "User not found!";
+                }
+                const newBalance = userDoc.data().balance + withdrawal.amount;
+                transaction.update(userRef, { balance: newBalance });
+                transaction.update(withdrawalRef, { status: newStatus });
+            });
+            toast({ title: 'Withdrawal Declined', description: 'The amount has been refunded to the user.' });
+        }
+    } catch (error) {
+        console.error("Error processing withdrawal: ", error);
+        toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' });
+    } finally {
+        setIsSubmitting(prev => ({ ...prev, [withdrawalId]: false }));
+    }
+  };
+
 
   if (loading || !user || user.role !== 'admin') {
     return (
@@ -93,8 +172,9 @@ export default function AdminPage() {
           <TabsList>
             <TabsTrigger value="deposits">Deposit Approvals</TabsTrigger>
             <TabsTrigger value="withdrawals">Withdrawal Approvals</TabsTrigger>
-            <TabsTrigger value="players">Player Management</TabsTrigger>
-            <TabsTrigger value="matches">Match History</TabsTrigger>
+            <TabsTrigger value="disputes">Dispute Resolution</TabsTrigger>
+            <TabsTrigger value="players" disabled>Player Management</TabsTrigger>
+            <TabsTrigger value="matches" disabled>Match History</TabsTrigger>
           </TabsList>
 
           <TabsContent value="deposits">
@@ -116,18 +196,18 @@ export default function AdminPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockDeposits.map((d) => (
+                    {deposits.map((d) => (
                       <TableRow key={d.depositId}>
                         <TableCell className="font-code">{d.userId}</TableCell>
                         <TableCell>{d.amount}৳</TableCell>
                         <TableCell className="font-code">{d.txId}</TableCell>
                         <TableCell>{getStatusBadge(d.status as any)}</TableCell>
-                         <TableCell><Button variant="outline" size="sm">View</Button></TableCell>
+                         <TableCell><Button variant="outline" size="sm" onClick={() => window.open(d.screenshotUrl, '_blank')}>View</Button></TableCell>
                         <TableCell className="space-x-2">
                            {d.status === 'pending' && (
                              <>
-                                <Button size="sm" className="bg-green-600 hover:bg-green-700">Approve</Button>
-                                <Button variant="destructive" size="sm">Decline</Button>
+                                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleDepositAction(d.depositId, 'approved')} disabled={isSubmitting[d.depositId]}>Approve</Button>
+                                <Button variant="destructive" size="sm" onClick={() => handleDepositAction(d.depositId, 'declined')} disabled={isSubmitting[d.depositId]}>Decline</Button>
                              </>
                            )}
                         </TableCell>
@@ -157,7 +237,7 @@ export default function AdminPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockWithdrawals.map((w) => (
+                    {withdrawals.map((w) => (
                       <TableRow key={w.withdrawalId}>
                         <TableCell className="font-code">{w.userId}</TableCell>
                         <TableCell>{w.amount}৳</TableCell>
@@ -166,8 +246,8 @@ export default function AdminPage() {
                         <TableCell className="space-x-2">
                            {w.status === 'pending' && (
                              <>
-                                <Button size="sm" className="bg-green-600 hover:bg-green-700">Approve</Button>
-                                <Button variant="destructive" size="sm">Decline</Button>
+                                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleWithdrawalAction(w.withdrawalId, 'approved')} disabled={isSubmitting[w.withdrawalId]}>Approve</Button>
+                                <Button variant="destructive" size="sm" onClick={() => handleWithdrawalAction(w.withdrawalId, 'declined')} disabled={isSubmitting[w.withdrawalId]}>Decline</Button>
                              </>
                            )}
                         </TableCell>
@@ -178,6 +258,9 @@ export default function AdminPage() {
               </CardContent>
             </Card>
           </TabsContent>
+            <TabsContent value="disputes">
+                <DisputeSummarizer />
+            </TabsContent>
         </Tabs>
       </main>
     </div>

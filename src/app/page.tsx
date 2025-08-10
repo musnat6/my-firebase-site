@@ -19,6 +19,7 @@ import {
   ShieldOff,
   DollarSign,
   ShieldCheck,
+  Loader2,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -64,12 +65,25 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [openDialog, setOpenDialog] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Form states
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositTxId, setDepositTxId] = useState('');
+  const [depositScreenshot, setDepositScreenshot] = useState<File | null>(null);
+
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawBkash, setWithdrawBkash] = useState('');
+
 
   useEffect(() => {
     if (!loading && !user) {
@@ -80,7 +94,7 @@ export default function DashboardPage() {
   if (loading || !user) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p>Loading...</p>
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -115,15 +129,65 @@ export default function DashboardPage() {
   
   const closeDialog = () => {
     setOpenDialog(null);
+    // Reset form fields
+    setDepositAmount('');
+    setDepositTxId('');
+    setDepositScreenshot(null);
+    setWithdrawAmount('');
+    setWithdrawBkash('');
   }
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Success!",
-      description: "Your request has been submitted and is pending approval."
-    });
-    closeDialog();
+    if (!user) return;
+    setIsSubmitting(true);
+
+    try {
+        if (openDialog === 'deposit') {
+            if (!depositScreenshot) {
+                toast({ title: "Screenshot required", description: "Please upload a screenshot.", variant: "destructive" });
+                setIsSubmitting(false);
+                return;
+            }
+            const storage = getStorage();
+            const screenshotRef = ref(storage, `deposits/${user.uid}/${Date.now()}_${depositScreenshot.name}`);
+            const uploadResult = await uploadBytes(screenshotRef, depositScreenshot);
+            const screenshotUrl = await getDownloadURL(uploadResult.ref);
+
+            await addDoc(collection(db, 'deposits'), {
+                userId: user.uid,
+                amount: Number(depositAmount),
+                txId: depositTxId,
+                screenshotUrl: screenshotUrl,
+                status: 'pending',
+                timestamp: serverTimestamp(),
+            });
+        } else if (openDialog === 'withdraw') {
+             await addDoc(collection(db, 'withdrawals'), {
+                userId: user.uid,
+                amount: Number(withdrawAmount),
+                bkashNumber: withdrawBkash,
+                status: 'pending',
+                timestamp: serverTimestamp(),
+            });
+        }
+        
+        toast({
+          title: "Success!",
+          description: "Your request has been submitted and is pending approval."
+        });
+        closeDialog();
+
+    } catch (error) {
+        console.error("Submission failed:", error);
+         toast({
+          title: "Submission Failed",
+          description: (error as Error).message,
+          variant: 'destructive',
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   return (
@@ -145,25 +209,25 @@ export default function DashboardPage() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton>
+                <SidebarMenuButton disabled>
                   <Swords />
                   <span>Matches</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton>
+                <SidebarMenuButton disabled>
                   <Trophy />
                   <span>Leaderboard</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton>
+                <SidebarMenuButton disabled>
                   <Wallet />
                   <span>Wallet</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton>
+                <SidebarMenuButton disabled>
                   <ShieldQuestion />
                   <span>Disputes</span>
                 </SidebarMenuButton>
@@ -368,7 +432,7 @@ export default function DashboardPage() {
                     {openDialog === 'suggestOpponents' && 'Based on your win/loss ratio, here are some suitable opponents.'}
                   </DialogDescription>
                 </DialogHeader>
-                 <form onSubmit={handleSubmit}>
+                 <form onSubmit={handleFormSubmit}>
                     <div className="py-4 space-y-4">
                     {openDialog === 'deposit' && (
                         <>
@@ -384,15 +448,15 @@ export default function DashboardPage() {
                         </Alert>
                         <div className="grid gap-2">
                             <Label htmlFor="amount">Amount (৳)</Label>
-                            <Input id="amount" placeholder="Enter amount" type="number" required />
+                            <Input id="amount" placeholder="Enter amount" type="number" required value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="trxId">bKash Transaction ID (TrxID)</Label>
-                            <Input id="trxId" placeholder="e.g., 9C7B8A1D2E" required />
+                            <Input id="trxId" placeholder="e.g., 9C7B8A1D2E" required value={depositTxId} onChange={(e) => setDepositTxId(e.target.value)} />
                         </div>
                          <div className="grid gap-2">
                             <Label htmlFor="screenshot">Screenshot</Label>
-                            <Input id="screenshot" type="file" required />
+                            <Input id="screenshot" type="file" required onChange={(e) => setDepositScreenshot(e.target.files ? e.target.files[0] : null)} />
                         </div>
                         </>
                     )}
@@ -400,11 +464,11 @@ export default function DashboardPage() {
                         <>
                         <div className="grid gap-2">
                             <Label htmlFor="withdraw-amount">Amount (৳)</Label>
-                            <Input id="withdraw-amount" placeholder="Enter amount to withdraw" type="number" required />
+                            <Input id="withdraw-amount" placeholder="Enter amount to withdraw" type="number" required value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="bkash-number">Your bKash Number</Label>
-                            <Input id="bkash-number" placeholder="e.g., 01xxxxxxxxx" required />
+                            <Input id="bkash-number" placeholder="e.g., 01xxxxxxxxx" required value={withdrawBkash} onChange={(e) => setWithdrawBkash(e.target.value)} />
                         </div>
                          <div className="grid gap-2">
                             <Label htmlFor="notes">Notes (Optional)</Label>
@@ -451,7 +515,10 @@ export default function DashboardPage() {
                      <DialogFooter>
                         <Button variant="outline" onClick={closeDialog} type="button">Cancel</Button>
                          {openDialog !== 'suggestOpponents' ? (
-                            <Button type="submit">Submit for Approval</Button>
+                            <Button type="submit" disabled={isSubmitting}>
+                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Submit for Approval
+                            </Button>
                          ) : (
                             <Button onClick={closeDialog} type="button">Close</Button>
                          )}
