@@ -20,10 +20,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, CheckCircle, Clock, Loader2, Save } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, Loader2, Save, Trophy } from 'lucide-react';
 import { collection, onSnapshot, doc, updateDoc, runTransaction, query, orderBy, getDocs, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Deposit, Withdrawal, User, Match, PaymentSettings } from '@/types';
@@ -282,6 +290,59 @@ export default function AdminPage() {
     { id: 'players', header: 'Players', cell: (info: any) => `${info.row.original.players.length} / ${info.row.original.type === '1v1' ? 2 : 8}` },
     { accessorKey: 'status', header: 'Status' },
     { id: 'winner', header: 'Winner', cell: (info: any) => info.row.original.winner?.username || 'N/A'},
+    { id: 'submissions', header: 'Submissions', cell: (info: any) => {
+        const m = info.row.original as Match;
+        const submissions = m.resultSubmissions ? Object.values(m.resultSubmissions) : [];
+        if (submissions.length === 0) {
+            return <span className="text-muted-foreground">N/A</span>;
+        }
+        return (
+            <Dialog>
+                <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">View Results ({submissions.length})</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Match Results: {m.title}</DialogTitle>
+                        <DialogDescription>Review player submissions to resolve this match.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-6 py-4">
+                        {m.players.map(player => {
+                            const submission = m.resultSubmissions?.[player.uid];
+                            const opponent = m.players.find(p => p.uid !== player.uid);
+                            return (
+                                <Card key={player.uid}>
+                                    <CardHeader>
+                                        <CardTitle>{player.username}'s Submission</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {submission ? (
+                                            <div className="space-y-4">
+                                                <Button asChild variant="secondary">
+                                                    <a href={submission.screenshotUrl} target="_blank" rel="noopener noreferrer">View Screenshot</a>
+                                                </Button>
+                                                {submission.aiAnalysis && (
+                                                     <Alert className="bg-primary/5 border-primary/20">
+                                                        <Trophy className="h-4 w-4 text-primary" />
+                                                        <AlertTitle className="text-primary">AI Detected Winner: {submission.aiAnalysis.winner.username}</AlertTitle>
+                                                        <AlertDescription className="mt-2 space-y-2">
+                                                            <p><strong className="font-semibold">Reasoning:</strong> {submission.aiAnalysis.reasoning}</p>
+                                                        </AlertDescription>
+                                                    </Alert>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <p className="text-muted-foreground">No submission from this player.</p>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )
+                        })}
+                    </div>
+                </DialogContent>
+            </Dialog>
+        )
+    }}
   ];
 
 
