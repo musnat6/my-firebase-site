@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Loader2,
   BarChart,
+  Trophy,
 } from 'lucide-react';
 import {
   SidebarProvider,
