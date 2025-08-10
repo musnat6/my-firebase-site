@@ -60,6 +60,8 @@ import { db } from '@/lib/firebase';
 import type { Match } from '@/types';
 import { LeaderboardTable } from '@/components/leaderboard-table';
 import { useUserMatches } from '@/hooks/use-user-matches';
+import { suggestOpponents, SuggestOpponentsOutput } from '@/ai/flows/suggest-opponents';
+
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
@@ -69,6 +71,8 @@ export default function DashboardPage() {
   const [openDialog, setOpenDialog] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
+  const [opponentSuggestions, setOpponentSuggestions] = useState<SuggestOpponentsOutput>([]);
+  const [isSuggesting, setIsSuggesting] = useState(false);
 
   // Form states
   const [depositAmount, setDepositAmount] = useState('');
@@ -108,32 +112,26 @@ export default function DashboardPage() {
     );
   }
 
-  const opponentSuggestions = [
-    {
-      userId: 'player123',
-      username: 'GameMaster',
-      winLossRatio: 1.2,
-      stats: { wins: 60, losses: 50, earnings: 30000 },
-      profilePic: 'https://placehold.co/80x80',
-    },
-    {
-      userId: 'player456',
-      username: 'ProGamer90',
-      winLossRatio: 0.9,
-      stats: { wins: 45, losses: 50, earnings: 15000 },
-      profilePic: 'https://placehold.co/80x80',
-    },
-    {
-      userId: 'player789',
-      username: 'NoobSlayer',
-      winLossRatio: 1.1,
-      stats: { wins: 55, losses: 50, earnings: 25000 },
-      profilePic: 'https://placehold.co/80x80',
-    },
-  ];
-
-  const handleQuickAction = (action: string) => {
+  const handleQuickAction = async (action: string) => {
     setOpenDialog(action);
+    if (action === 'suggestOpponents') {
+      setIsSuggesting(true);
+      try {
+        const winLossRatio = user.stats.losses > 0 ? user.stats.wins / user.stats.losses : user.stats.wins;
+        const suggestions = await suggestOpponents({
+          userId: user.uid,
+          winLossRatio: winLossRatio,
+          gameType: '1v1', // Or make this selectable
+          numOpponents: 3
+        });
+        setOpponentSuggestions(suggestions);
+      } catch (error) {
+        console.error("Error suggesting opponents:", error);
+        toast({ title: 'Error', description: 'Could not fetch opponent suggestions.', variant: 'destructive' });
+      } finally {
+        setIsSuggesting(false);
+      }
+    }
   };
 
   const closeDialog = () => {
@@ -145,6 +143,7 @@ export default function DashboardPage() {
     setWithdrawError('');
     setMatchTitle('');
     setEntryFee('');
+    setOpponentSuggestions([]);
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -158,7 +157,7 @@ export default function DashboardPage() {
           userId: user.uid,
           amount: Number(depositAmount),
           txId: depositTxId,
-          screenshotUrl: 'disabled_for_now',
+          screenshotUrl: 'disabled_for_now', // Screenshot upload disabled
           status: 'pending',
           timestamp: Date.now(),
         });
@@ -202,7 +201,7 @@ export default function DashboardPage() {
       setIsSubmitting(false);
     }
   };
-
+  
   const navigate = (path: string) => {
     setActiveTab(path);
     router.push(`/${path}`);
@@ -447,21 +446,29 @@ export default function DashboardPage() {
                     )}
                     {openDialog === 'suggestOpponents' && (
                         <div className="grid gap-4">
-                        {opponentSuggestions.map((opp) => (
-                            <Card key={opp.userId}>
-                            <CardContent className="flex items-center gap-4 p-4">
-                                <div className="flex-grow">
-                                <h3 className="font-bold text-lg">{opp.username}</h3>
-                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                                    <span>W/L: {opp.winLossRatio}</span>
-                                    <span>Wins: {opp.stats.wins}</span>
-                                    <span>Earnings: {opp.stats.earnings}৳</span>
-                                </div>
-                                </div>
-                                <Button size="sm">Challenge</Button>
-                            </CardContent>
-                            </Card>
-                        ))}
+                          {isSuggesting ? (
+                            <div className="flex items-center justify-center h-24">
+                              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                            </div>
+                          ) : opponentSuggestions.length > 0 ? (
+                            opponentSuggestions.map((opp) => (
+                              <Card key={opp.userId}>
+                                <CardContent className="flex items-center gap-4 p-4">
+                                  <div className="flex-grow">
+                                    <h3 className="font-bold text-lg">{opp.username}</h3>
+                                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                                      <span>W/L: {opp.winLossRatio.toFixed(2)}</span>
+                                      <span>Wins: {opp.stats?.wins ?? 'N/A'}</span>
+                                      <span>Earnings: {opp.stats?.earnings ?? 'N/A'}৳</span>
+                                    </div>
+                                  </div>
+                                  <Button size="sm">Challenge</Button>
+                                </CardContent>
+                              </Card>
+                            ))
+                          ) : (
+                             <p className="text-center text-muted-foreground">No suitable opponents found.</p>
+                          )}
                         </div>
                     )}
                     </div>
