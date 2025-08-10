@@ -1,6 +1,6 @@
 
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import Image from 'next/image';
@@ -32,6 +32,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -61,11 +62,14 @@ import { mockMatches, mockLeaderboard } from '@/lib/data';
 import { MatchCard } from '@/components/match-card';
 import { UserNav } from '@/components/user-nav';
 import { useToast } from '@/hooks/use-toast';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const [openDialog, setOpenDialog] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -104,6 +108,14 @@ export default function DashboardPage() {
       profilePic: 'https://placehold.co/80x80',
     },
   ];
+
+  const handleQuickAction = (action: string) => {
+    setOpenDialog(action);
+  };
+  
+  const closeDialog = () => {
+    setOpenDialog(null);
+  }
 
   return (
     <SidebarProvider>
@@ -167,10 +179,10 @@ export default function DashboardPage() {
         </Sidebar>
 
         <SidebarInset>
-          <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6">
+          <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="md:hidden" />
-              <h1 className="text-lg font-semibold md:text-xl font-headline">
+              <h1 className="text-lg font-semibold md:text-xl font-headline truncate">
                 Welcome, {user.username}!
               </h1>
             </div>
@@ -184,7 +196,7 @@ export default function DashboardPage() {
           </header>
 
           <main className="flex-1 space-y-6 p-4 md:p-6">
-            <section className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <section className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Balance</CardTitle>
@@ -246,51 +258,18 @@ export default function DashboardPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-4">
-                  <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                  <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground" onClick={() => handleQuickAction('createMatch')}>
                     <PlusCircle className="mr-2 h-5 w-5" /> Create New Match
                   </Button>
-                  <Button size="lg" variant="outline">
+                  <Button size="lg" variant="outline" onClick={() => handleQuickAction('deposit')}>
                     <Landmark className="mr-2 h-5 w-5" /> Deposit Funds
                   </Button>
-                  <Button size="lg" variant="outline">
+                  <Button size="lg" variant="outline" onClick={() => handleQuickAction('withdraw')}>
                     <Banknote className="mr-2 h-5 w-5" /> Withdraw Winnings
                   </Button>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button size="lg" variant="outline" className="text-primary border-primary hover:bg-primary/10 hover:text-primary">
-                        <Users className="mr-2 h-5 w-5" /> Suggest Opponents
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[625px]">
-                      <DialogHeader>
-                        <DialogTitle className="font-headline">AI Opponent Suggestions</DialogTitle>
-                        <DialogDescription>
-                          Based on your win/loss ratio, here are some suitable opponents.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="grid gap-4 py-4">
-                        {opponentSuggestions.map((opp) => (
-                           <Card key={opp.userId}>
-                             <CardContent className="flex items-center gap-4 p-4">
-                               <Avatar className="h-16 w-16">
-                                 <AvatarImage src={opp.profilePic} alt={opp.username} data-ai-hint="avatar" />
-                                 <AvatarFallback>{opp.username.charAt(0)}</AvatarFallback>
-                               </Avatar>
-                               <div className="flex-grow">
-                                 <h3 className="font-bold text-lg">{opp.username}</h3>
-                                 <div className="flex gap-4 text-sm text-muted-foreground">
-                                   <span>W/L Ratio: {opp.winLossRatio}</span>
-                                   <span>Wins: {opp.stats.wins}</span>
-                                   <span>Earnings: {opp.stats.earnings}৳</span>
-                                 </div>
-                               </div>
-                               <Button>Challenge</Button>
-                             </CardContent>
-                           </Card>
-                        ))}
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                  <Button size="lg" variant="outline" className="text-primary border-primary hover:bg-primary/10 hover:text-primary" onClick={() => handleQuickAction('suggestOpponents')}>
+                    <Users className="mr-2 h-5 w-5" /> Suggest Opponents
+                  </Button>
                 </CardContent>
               </Card>
             </section>
@@ -319,18 +298,18 @@ export default function DashboardPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[80px]">Rank</TableHead>
+                          <TableHead className="w-[80px] text-center">Rank</TableHead>
                           <TableHead>Player</TableHead>
                           <TableHead className="text-right">Earnings</TableHead>
-                          <TableHead className="hidden md:table-cell text-right">Wins</TableHead>
-                          <TableHead className="hidden md:table-cell text-right">Losses</TableHead>
+                          <TableHead className="hidden text-right md:table-cell">Wins</TableHead>
+                          <TableHead className="hidden text-right md:table-cell">Losses</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {mockLeaderboard.map((player, index) => (
                           <TableRow key={player.userId}>
                             <TableCell className="font-bold text-lg">
-                              <div className="flex items-center justify-center h-10 w-10 rounded-full bg-muted">
+                              <div className="flex items-center justify-center h-10 w-10 rounded-full bg-muted mx-auto">
                                 {index + 1}
                               </div>
                             </TableCell>
@@ -340,12 +319,12 @@ export default function DashboardPage() {
                                   <AvatarImage src={player.profilePic} alt={player.username} data-ai-hint="avatar" />
                                   <AvatarFallback>{player.username.charAt(0)}</AvatarFallback>
                                 </Avatar>
-                                <span className="font-medium">{player.username}</span>
+                                <span className="font-medium truncate">{player.username}</span>
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-bold text-primary">{player.earnings}৳</TableCell>
-                            <TableCell className="hidden md:table-cell text-right text-green-600">{player.wins}</TableCell>
-                            <TableCell className="hidden md:table-cell text-right text-red-600">{player.losses}</TableCell>
+                            <TableCell className="hidden text-right text-green-600 md:table-cell">{player.wins}</TableCell>
+                            <TableCell className="hidden text-right text-red-600 md:table-cell">{player.losses}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -354,9 +333,84 @@ export default function DashboardPage() {
                 </Card>
               </TabsContent>
             </Tabs>
+            
+            {/* Dialog for Quick Actions */}
+            <Dialog open={openDialog !== null} onOpenChange={(isOpen) => !isOpen && closeDialog()}>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>
+                    {openDialog === 'createMatch' && 'Create New Match'}
+                    {openDialog === 'deposit' && 'Deposit Funds'}
+                    {openDialog === 'withdraw' && 'Withdraw Winnings'}
+                    {openDialog === 'suggestOpponents' && 'AI Opponent Suggestions'}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {openDialog === 'createMatch' && 'Set up a new match for others to join.'}
+                    {openDialog === 'deposit' && 'Add funds to your wallet to play matches.'}
+                    {openDialog === 'withdraw' && 'Cash out your winnings.'}
+                    {openDialog === 'suggestOpponents' && 'Based on your win/loss ratio, here are some suitable opponents.'}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                  {openDialog === 'suggestOpponents' ? (
+                    <div className="grid gap-4">
+                      {opponentSuggestions.map((opp) => (
+                         <Card key={opp.userId}>
+                           <CardContent className="flex items-center gap-4 p-4">
+                             <Avatar className="h-16 w-16">
+                               <AvatarImage src={opp.profilePic} alt={opp.username} data-ai-hint="avatar" />
+                               <AvatarFallback>{opp.username.charAt(0)}</AvatarFallback>
+                             </Avatar>
+                             <div className="flex-grow">
+                               <h3 className="font-bold text-lg">{opp.username}</h3>
+                               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                                 <span>W/L: {opp.winLossRatio}</span>
+                                 <span>Wins: {opp.stats.wins}</span>
+                                 <span>Earnings: {opp.stats.earnings}৳</span>
+                               </div>
+                             </div>
+                             <Button size="sm">Challenge</Button>
+                           </CardContent>
+                         </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid gap-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="amount">Amount</Label>
+                            <Input id="amount" placeholder="Enter amount" type="number" />
+                        </div>
+                         {openDialog === 'deposit' && (
+                             <div className="grid gap-2">
+                                <Label htmlFor="trxId">Transaction ID</Label>
+                                <Input id="trxId" placeholder="BKash/Nagad TrxID" />
+                            </div>
+                         )}
+                          {openDialog === 'withdraw' && (
+                             <div className="grid gap-2">
+                                <Label htmlFor="number">Receiving Number</Label>
+                                <Input id="number" placeholder="Your BKash/Nagad number" />
+                            </div>
+                         )}
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={closeDialog}>Cancel</Button>
+                  <Button type="submit">
+                    {openDialog === 'createMatch' && 'Create'}
+                    {openDialog === 'deposit' && 'Deposit'}
+                    {openDialog === 'withdraw' && 'Withdraw'}
+                     {openDialog === 'suggestOpponents' && 'Close'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
           </main>
         </SidebarInset>
       </div>
     </SidebarProvider>
   );
 }
+ 
