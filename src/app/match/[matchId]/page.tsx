@@ -86,9 +86,10 @@ function ResultSubmissionCard({
 
         } catch (error) {
             console.error('Error submitting result:', error);
+            const errorMessage = (error instanceof Error && error.message) ? error.message : "An unknown error occurred.";
             toast({
                 title: 'Submission Failed',
-                description: (error as Error).message,
+                description: errorMessage,
                 variant: 'destructive',
             });
             setIsVerifying(false);
