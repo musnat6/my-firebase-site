@@ -24,8 +24,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, CheckCircle, Clock, Loader2, Save, Trophy, UserX } from 'lucide-react';
-import { collection, onSnapshot, doc, updateDoc, runTransaction, query, orderBy, getDocs, setDoc } from 'firebase/firestore';
+import { AlertTriangle, CheckCircle, Clock, Loader2, Save, UserX } from 'lucide-react';
+import { collection, onSnapshot, doc, updateDoc, runTransaction, query, orderBy, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Deposit, Withdrawal, User, Match, PlayerRef, PaymentSettings } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -364,7 +364,7 @@ export default function AdminPage() {
         return (
             <Dialog>
                 <DialogTrigger asChild>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" disabled={submissions.length === 0}>
                         View Results {submissions.length > 0 && `(${submissions.length})`}
                     </Button>
                 </DialogTrigger>
@@ -380,7 +380,7 @@ export default function AdminPage() {
                                 <Card key={player.uid}>
                                     <CardHeader className="flex-row items-center justify-between">
                                         <CardTitle>{player.username}</CardTitle>
-                                        {m.status === 'inprogress' && (
+                                        {(m.status === 'inprogress' || m.status === 'disputed') && (
                                             <Button 
                                                 size="sm" 
                                                 onClick={() => handleDeclareWinner(m.matchId, player, m.players, m.entryFee)} 
@@ -397,15 +397,6 @@ export default function AdminPage() {
                                                 <Button asChild variant="secondary">
                                                     <a href={submission.screenshotUrl} target="_blank" rel="noopener noreferrer">View Screenshot</a>
                                                 </Button>
-                                                {submission.aiAnalysis && (
-                                                     <Alert className="bg-primary/5 border-primary/20">
-                                                        <Trophy className="h-4 w-4 text-primary" />
-                                                        <AlertTitle className="text-primary">AI Detected Winner: {submission.aiAnalysis.winner.username}</AlertTitle>
-                                                        <AlertDescription className="mt-2 space-y-2">
-                                                            <p><strong className="font-semibold">Reasoning:</strong> {submission.aiAnalysis.reasoning}</p>
-                                                        </AlertDescription>
-                                                    </Alert>
-                                                )}
                                             </div>
                                         ) : (
                                             <div className="flex flex-col items-center justify-center text-center h-24 text-muted-foreground">

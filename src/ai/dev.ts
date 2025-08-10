@@ -5,4 +5,3 @@ config();
 import '@/ai/flows/suggest-opponents.ts';
 import '@/ai/flows/generate-match-description.ts';
 import '@/ai/flows/summarize-disputes.ts';
-import '@/ai/flows/verify-match-result.ts';

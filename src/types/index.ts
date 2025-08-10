@@ -20,18 +20,10 @@ export interface User {
   };
 }
 
-export interface AiAnalysisResult {
-    winner: PlayerRef;
-    reasoning: string;
-    confidence: number;
-}
-
-
 export interface ResultSubmission {
   submittedBy: string; // uid of the player who submitted
   screenshotUrl: string;
   submittedAt: number;
-  aiAnalysis?: AiAnalysisResult;
   confirmedByOpponent: boolean;
 }
 

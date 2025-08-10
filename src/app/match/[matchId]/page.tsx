@@ -16,24 +16,19 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { verifyMatchResult, VerifyMatchResultOutput } from '@/ai/flows/verify-match-result';
 
 function ResultSubmissionCard({ 
     match, 
     player, 
-    opponent,
     user,
 }: { 
     match: Match, 
     player: NonNullable<Match['players'][0]>, 
-    opponent: NonNullable<Match['players'][0]>,
     user: User 
 }) {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [isVerifying, setIsVerifying] = useState(false);
-    const [aiResult, setAiResult] = useState<VerifyMatchResultOutput | null>(null);
 
     const playerSubmission = match.resultSubmissions?.[player.uid];
 
@@ -51,7 +46,6 @@ function ResultSubmissionCard({
         if (!selectedFile || !user || !match) return;
 
         setIsSubmitting(true);
-        setIsVerifying(true);
 
         try {
             const photoDataUri = await fileToDataUri(selectedFile);
@@ -61,19 +55,10 @@ function ResultSubmissionCard({
             await uploadString(screenshotRef, photoDataUri, 'data_url');
             const screenshotUrl = await getDownloadURL(screenshotRef);
 
-            const aiAnalysis = await verifyMatchResult({
-                player1: { uid: user.uid, username: user.username },
-                player2: { uid: opponent.uid, username: opponent.username },
-                screenshotDataUri: photoDataUri,
-            });
-            setAiResult(aiAnalysis);
-            setIsVerifying(false);
-
             const newSubmission: ResultSubmission = {
                 submittedBy: player.uid,
                 screenshotUrl,
                 submittedAt: Date.now(),
-                aiAnalysis,
                 confirmedByOpponent: false
             };
             
@@ -82,7 +67,7 @@ function ResultSubmissionCard({
                 [`resultSubmissions.${player.uid}`]: newSubmission
             });
 
-            toast({ title: 'Result Submitted', description: 'Your result has been submitted for review.', className: 'bg-green-600 text-white' });
+            toast({ title: 'Result Submitted', description: 'Your result has been submitted for admin review.', className: 'bg-green-600 text-white' });
 
         } catch (error) {
             console.error('Error submitting result:', error);
@@ -95,10 +80,9 @@ function ResultSubmissionCard({
             
             toast({
                 title: 'Submission Failed',
-                description: `AI Verification Failed: ${errorMessage}`,
+                description: errorMessage,
                 variant: 'destructive',
             });
-            setIsVerifying(false);
         } finally {
             setIsSubmitting(false);
         }
@@ -115,15 +99,6 @@ function ResultSubmissionCard({
                     <a href={playerSubmission.screenshotUrl} target="_blank" rel="noopener noreferrer">
                         <Button variant="secondary">View Screenshot</Button>
                     </a>
-                     {playerSubmission.aiAnalysis && (
-                         <Alert className="bg-primary/5 border-primary/20">
-                            <Trophy className="h-4 w-4 text-primary" />
-                            <AlertTitle className="text-primary">AI Detected Winner: {playerSubmission.aiAnalysis.winner.username}</AlertTitle>
-                            <AlertDescription className="mt-2 space-y-2">
-                                <p><strong className="font-semibold">Reasoning:</strong> {playerSubmission.aiAnalysis.reasoning}</p>
-                            </AlertDescription>
-                        </Alert>
-                     )}
                 </CardContent>
             </Card>
         )
@@ -146,7 +121,7 @@ function ResultSubmissionCard({
         <Card>
             <CardHeader>
                 <CardTitle>Submit Your Result</CardTitle>
-                <CardDescription>Upload a screenshot of the final score screen to verify the winner.</CardDescription>
+                <CardDescription>Upload a screenshot of the final score screen. An admin will verify the winner.</CardDescription>
             </CardHeader>
             <form onSubmit={handleSubmitResult}>
                 <CardContent className="space-y-4">
@@ -162,8 +137,8 @@ function ResultSubmissionCard({
                         <Input id="screenshot" type="file" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} required accept="image/*" />
                     </div>
                     <Button type="submit" disabled={isSubmitting || !selectedFile}>
-                        {(isSubmitting || isVerifying) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {isVerifying ? 'AI is Verifying...' : isSubmitting ? 'Submitting...' : 'Submit Result'}
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isSubmitting ? 'Submitting...' : 'Submit Result'}
                     </Button>
                 </CardContent>
             </form>
@@ -265,9 +240,9 @@ export default function MatchDetailPage() {
 
             {userIsInMatch && isMatchInProgress && (
                 <div className="grid md:grid-cols-2 gap-6">
-                    <ResultSubmissionCard match={match} player={player1} opponent={player2} user={user} />
+                    <ResultSubmissionCard match={match} player={player1} user={user} />
                     {player2 ? (
-                        <ResultSubmissionCard match={match} player={player2} opponent={player1} user={user} />
+                        <ResultSubmissionCard match={match} player={player2} user={user} />
                     ) : null}
                 </div>
             )}
