@@ -53,10 +53,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (userDoc.exists()) {
           setUser(userDoc.data() as User);
         } else {
-          // If the user signed up with Google, their displayName and photoURL might be available
+          // If the user signed up with Google for the first time
           const displayName = firebaseUser.displayName || 'New User';
           const photoURL = firebaseUser.photoURL || `https://placehold.co/100x100`;
-
+          
           const newUser: User = {
             uid: firebaseUser.uid,
             email: firebaseUser.email!,
@@ -81,8 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUpWithEmail = async (email: string, password: string, username: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const photoURL = `https://placehold.co/100x100`;
+    
+    // update firebase auth profile
     await updateProfile(userCredential.user, { displayName: username, photoURL: photoURL });
 
+    // create user document in firestore
     const newUser: User = {
       uid: userCredential.user.uid,
       email: userCredential.user.email!,
@@ -93,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       stats: { wins: 0, losses: 0, earnings: 0 },
     };
     await setDoc(doc(db, 'users', newUser.uid), newUser);
+    setUser(newUser);
   };
 
   const signInWithEmail = async (email: string, password: string) => {
