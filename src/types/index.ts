@@ -30,9 +30,10 @@ export interface Match {
 
 export interface LeaderboardEntry {
   userId: string;
+  earnings: number;
+  // Denormalized data for easy display
   username: string;
   profilePic: string;
-  earnings: number;
   wins: number;
   losses: number;
 }
@@ -41,17 +42,17 @@ export interface Deposit {
   depositId: string;
   userId: string;
   amount: number;
-  transactionId: string;
-  senderNumber: string;
-  status: 'pending' | 'approved' | 'rejected';
-  createdAt: number;
+  txId: string;
+  screenshotUrl: string;
+  status: 'pending' | 'approved' | 'declined';
+  timestamp: number;
 }
 
 export interface Withdrawal {
   withdrawalId: string;
   userId: string;
   amount: number;
-  withdrawalNumber: string;
-  status: 'pending' | 'approved' | 'rejected';
-  createdAt: number;
+  bkashNumber: string;
+  status: 'pending' | 'approved' | 'declined';
+  timestamp: number;
 }

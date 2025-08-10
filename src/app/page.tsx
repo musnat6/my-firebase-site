@@ -18,6 +18,7 @@ import {
   Crown,
   ShieldOff,
   DollarSign,
+  ShieldCheck,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -35,7 +36,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   SidebarProvider,
@@ -47,7 +47,6 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarTrigger,
-  SidebarInset,
 } from '@/components/ui/sidebar';
 import {
   Table,
@@ -64,6 +63,7 @@ import { UserNav } from '@/components/user-nav';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
@@ -116,6 +116,15 @@ export default function DashboardPage() {
   const closeDialog = () => {
     setOpenDialog(null);
   }
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast({
+      title: "Success!",
+      description: "Your request has been submitted and is pending approval."
+    });
+    closeDialog();
+  }
 
   return (
     <SidebarProvider>
@@ -159,6 +168,14 @@ export default function DashboardPage() {
                   <span>Disputes</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {user.role === 'admin' && (
+                 <SidebarMenuItem>
+                    <SidebarMenuButton onClick={() => router.push('/admin')}>
+                        <ShieldCheck />
+                        <span>Admin Panel</span>
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter>
@@ -336,74 +353,110 @@ export default function DashboardPage() {
             
             {/* Dialog for Quick Actions */}
             <Dialog open={openDialog !== null} onOpenChange={(isOpen) => !isOpen && closeDialog()}>
-              <DialogContent className="sm:max-w-[425px]">
+              <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>
                     {openDialog === 'createMatch' && 'Create New Match'}
-                    {openDialog === 'deposit' && 'Deposit Funds'}
+                    {openDialog === 'deposit' && 'Manual bKash Deposit'}
                     {openDialog === 'withdraw' && 'Withdraw Winnings'}
                     {openDialog === 'suggestOpponents' && 'AI Opponent Suggestions'}
                   </DialogTitle>
-                  <DialogDescription>
+                   <DialogDescription>
                     {openDialog === 'createMatch' && 'Set up a new match for others to join.'}
-                    {openDialog === 'deposit' && 'Add funds to your wallet to play matches.'}
-                    {openDialog === 'withdraw' && 'Cash out your winnings.'}
+                    {openDialog === 'deposit' && 'Send bKash payment and submit details for verification.'}
+                    {openDialog === 'withdraw' && 'Request to withdraw your winnings to your bKash account.'}
                     {openDialog === 'suggestOpponents' && 'Based on your win/loss ratio, here are some suitable opponents.'}
                   </DialogDescription>
                 </DialogHeader>
-                <div className="py-4">
-                  {openDialog === 'suggestOpponents' ? (
-                    <div className="grid gap-4">
-                      {opponentSuggestions.map((opp) => (
-                         <Card key={opp.userId}>
-                           <CardContent className="flex items-center gap-4 p-4">
-                             <Avatar className="h-16 w-16">
-                               <AvatarImage src={opp.profilePic} alt={opp.username} data-ai-hint="avatar" />
-                               <AvatarFallback>{opp.username.charAt(0)}</AvatarFallback>
-                             </Avatar>
-                             <div className="flex-grow">
-                               <h3 className="font-bold text-lg">{opp.username}</h3>
-                               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                                 <span>W/L: {opp.winLossRatio}</span>
-                                 <span>Wins: {opp.stats.wins}</span>
-                                 <span>Earnings: {opp.stats.earnings}৳</span>
-                               </div>
-                             </div>
-                             <Button size="sm">Challenge</Button>
-                           </CardContent>
-                         </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="grid gap-4">
+                 <form onSubmit={handleSubmit}>
+                    <div className="py-4 space-y-4">
+                    {openDialog === 'deposit' && (
+                        <>
+                         <Alert>
+                            <AlertTitle className="font-bold">Payment Instructions</AlertTitle>
+                            <AlertDescription>
+                                1. Send your payment to the bKash number: <strong className="font-code">01860151497</strong>
+                                <br/>
+                                2. Enter the amount and the Transaction ID (TrxID) below.
+                                <br />
+                                3. Upload a screenshot of the confirmation message.
+                            </AlertDescription>
+                        </Alert>
                         <div className="grid gap-2">
-                            <Label htmlFor="amount">Amount</Label>
-                            <Input id="amount" placeholder="Enter amount" type="number" />
+                            <Label htmlFor="amount">Amount (৳)</Label>
+                            <Input id="amount" placeholder="Enter amount" type="number" required />
                         </div>
-                         {openDialog === 'deposit' && (
-                             <div className="grid gap-2">
-                                <Label htmlFor="trxId">Transaction ID</Label>
-                                <Input id="trxId" placeholder="BKash/Nagad TrxID" />
-                            </div>
-                         )}
-                          {openDialog === 'withdraw' && (
-                             <div className="grid gap-2">
-                                <Label htmlFor="number">Receiving Number</Label>
-                                <Input id="number" placeholder="Your BKash/Nagad number" />
-                            </div>
-                         )}
+                        <div className="grid gap-2">
+                            <Label htmlFor="trxId">bKash Transaction ID (TrxID)</Label>
+                            <Input id="trxId" placeholder="e.g., 9C7B8A1D2E" required />
+                        </div>
+                         <div className="grid gap-2">
+                            <Label htmlFor="screenshot">Screenshot</Label>
+                            <Input id="screenshot" type="file" required />
+                        </div>
+                        </>
+                    )}
+                    {openDialog === 'withdraw' && (
+                        <>
+                        <div className="grid gap-2">
+                            <Label htmlFor="withdraw-amount">Amount (৳)</Label>
+                            <Input id="withdraw-amount" placeholder="Enter amount to withdraw" type="number" required />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="bkash-number">Your bKash Number</Label>
+                            <Input id="bkash-number" placeholder="e.g., 01xxxxxxxxx" required />
+                        </div>
+                         <div className="grid gap-2">
+                            <Label htmlFor="notes">Notes (Optional)</Label>
+                            <Input id="notes" placeholder="Any extra details for the admin" />
+                        </div>
+                        </>
+                    )}
+                     {openDialog === 'createMatch' && (
+                        <>
+                        <div className="grid gap-2">
+                            <Label htmlFor="title">Match Title</Label>
+                            <Input id="title" placeholder="e.g., Weekend Warriors" required />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="entry-fee">Entry Fee (minimum 50৳)</Label>
+                            <Input id="entry-fee" placeholder="50" type="number" min="50" required />
+                        </div>
+                        </>
+                    )}
+                    {openDialog === 'suggestOpponents' && (
+                        <div className="grid gap-4">
+                        {opponentSuggestions.map((opp) => (
+                            <Card key={opp.userId}>
+                            <CardContent className="flex items-center gap-4 p-4">
+                                <Avatar className="h-16 w-16">
+                                <AvatarImage src={opp.profilePic} alt={opp.username} data-ai-hint="avatar" />
+                                <AvatarFallback>{opp.username.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-grow">
+                                <h3 className="font-bold text-lg">{opp.username}</h3>
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                                    <span>W/L: {opp.winLossRatio}</span>
+                                    <span>Wins: {opp.stats.wins}</span>
+                                    <span>Earnings: {opp.stats.earnings}৳</span>
+                                </div>
+                                </div>
+                                <Button size="sm">Challenge</Button>
+                            </CardContent>
+                            </Card>
+                        ))}
+                        </div>
+                    )}
                     </div>
-                  )}
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={closeDialog}>Cancel</Button>
-                  <Button type="submit">
-                    {openDialog === 'createMatch' && 'Create'}
-                    {openDialog === 'deposit' && 'Deposit'}
-                    {openDialog === 'withdraw' && 'Withdraw'}
-                     {openDialog === 'suggestOpponents' && 'Close'}
-                  </Button>
-                </DialogFooter>
+                     <DialogFooter>
+                        <Button variant="outline" onClick={closeDialog} type="button">Cancel</Button>
+                         {openDialog !== 'suggestOpponents' ? (
+                            <Button type="submit">Submit for Approval</Button>
+                         ) : (
+                            <Button onClick={closeDialog} type="button">Close</Button>
+                         )}
+                    </DialogFooter>
+                </form>
               </DialogContent>
             </Dialog>
 
@@ -413,6 +466,3 @@ export default function DashboardPage() {
     </SidebarProvider>
   );
 }
- 
-
-    
