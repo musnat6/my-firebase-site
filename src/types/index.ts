@@ -1,4 +1,5 @@
 
+
 export interface PlayerRef {
     uid: string;
     username: string;
@@ -28,7 +29,16 @@ export interface Match {
   players: PlayerRef[]; // array of player objects
   status: 'open' | 'inprogress' | 'pending_confirmation' | 'completed' | 'disputed';
   winner?: PlayerRef;
-  proofUrl?: string;
+  resultProof?: {
+    submittedBy: string;
+    screenshotUrl: string;
+    submittedAt: number;
+    aiAnalysis?: {
+      winnerUid: string;
+      reasoning: string;
+      confidence: number;
+    }
+  },
   dispute?: {
     reportedBy: string;
     reason: string;

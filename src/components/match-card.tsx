@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Users, Swords, Gamepad2, Trophy, Loader2 } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
-import { doc, updateDoc, arrayUnion, runTransaction } from "firebase/firestore"
+import { doc, updateDoc, arrayUnion, runTransaction, arrayRemove } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 
 interface MatchCardProps {
   match: Match
@@ -19,6 +20,7 @@ interface MatchCardProps {
 export function MatchCard({ match }: MatchCardProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   const [isJoining, setIsJoining] = useState(false);
 
   const getStatusBadgeVariant = (status: Match['status']) => {
@@ -52,16 +54,35 @@ export function MatchCard({ match }: MatchCardProps) {
             const matchDoc = await transaction.get(matchRef);
             if (!matchDoc.exists()) throw new Error("Match not found!");
 
+            const currentMatch = matchDoc.data() as Match;
+            if (currentMatch.players.some(p => p.uid === user.uid)) {
+                throw new Error("You are already in this match.");
+            }
+            if (currentMatch.players.length >= (currentMatch.type === '1v1' ? 2 : 8)) {
+                throw new Error("This match is already full.");
+            }
+
             const currentBalance = userDoc.data().balance || 0;
             if (currentBalance < match.entryFee) {
                 throw new Error(`Insufficient funds. You need ${match.entryFee}৳ to join.`);
             }
 
             const newPlayer: PlayerRef = { uid: user.uid, username: user.username, profilePic: user.profilePic };
-            transaction.update(matchRef, { players: arrayUnion(newPlayer) });
+            const updatedPlayers = [...currentMatch.players, newPlayer];
+            
+            let newStatus = currentMatch.status;
+            if (updatedPlayers.length === (currentMatch.type === '1v1' ? 2 : 8)) {
+                newStatus = 'inprogress';
+            }
+
+            transaction.update(matchRef, { players: updatedPlayers, status: newStatus });
         });
 
         toast({ title: "Successfully Joined!", description: "Good luck in your match.", className: "bg-green-600 text-white" });
+        if(match.players.length + 1 === (match.type === '1v1' ? 2 : 8)) {
+            router.push(`/match/${match.matchId}`);
+        }
+
     } catch (error) {
         console.error("Error joining match:", error);
         toast({ title: "Error Joining Match", description: (error as Error).message, variant: "destructive" });
@@ -83,9 +104,16 @@ export function MatchCard({ match }: MatchCardProps) {
             return <Gamepad2 className="h-12 w-12 text-primary/80" />;
     }
   }
+  
+  const handleCardClick = () => {
+    router.push(`/match/${match.matchId}`);
+  };
 
   return (
-    <Card className="flex flex-col h-full hover:shadow-accent/20 hover:shadow-lg transition-shadow duration-300 overflow-hidden bg-card">
+    <Card 
+        className="flex flex-col h-full hover:shadow-accent/20 hover:shadow-lg transition-shadow duration-300 overflow-hidden bg-card cursor-pointer"
+        onClick={handleCardClick}
+    >
         <div className="aspect-video bg-muted/50 flex items-center justify-center">
             {getIcon()}
         </div>
@@ -111,7 +139,10 @@ export function MatchCard({ match }: MatchCardProps) {
           className="w-full mt-2" 
           disabled={match.status !== 'open' || userIsInMatch || isFull || isJoining} 
           variant="default"
-          onClick={handleJoinMatch}
+          onClick={(e) => {
+              e.stopPropagation(); // prevent card click event
+              handleJoinMatch();
+          }}
         >
           {isJoining && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {userIsInMatch ? 'Joined' : isFull ? 'Match Full' : 'Join Match'}
