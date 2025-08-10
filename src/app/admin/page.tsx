@@ -106,24 +106,31 @@ export default function AdminPage() {
     const withdrawalRef = doc(db, 'withdrawals', withdrawalId);
     const withdrawal = withdrawals.find(w => w.withdrawalId === withdrawalId);
     if (!withdrawal) return;
+    
+    const userRef = doc(db, 'users', withdrawal.userId);
 
     try {
         if (newStatus === 'approved') {
-             await updateDoc(withdrawalRef, { status: newStatus });
-             toast({ title: 'Withdrawal Approved', description: 'Remember to send the payment manually.' });
-        } else {
-            // If declined, refund the amount to the user's balance.
-            const userRef = doc(db, 'users', withdrawal.userId);
-             await runTransaction(db, async (transaction) => {
+            await runTransaction(db, async (transaction) => {
                 const userDoc = await transaction.get(userRef);
                 if (!userDoc.exists()) {
-                    throw "User not found!";
+                    throw new Error("User not found!");
                 }
-                const newBalance = userDoc.data().balance + withdrawal.amount;
+                const currentBalance = userDoc.data().balance || 0;
+                if (currentBalance < withdrawal.amount) {
+                    throw new Error("User has insufficient funds for this withdrawal.");
+                }
+                const newBalance = currentBalance - withdrawal.amount;
                 transaction.update(userRef, { balance: newBalance });
                 transaction.update(withdrawalRef, { status: newStatus });
             });
-            toast({ title: 'Withdrawal Declined', description: 'The amount has been refunded to the user.' });
+            toast({ title: 'Withdrawal Approved', description: 'User balance has been deducted. Remember to send the payment manually.' });
+        } else {
+            // If declined, refund the amount to the user's balance. This logic was incorrect before.
+            // On second thought, if a pending withdrawal is declined, no balance change should have occurred yet.
+            // The balance is only deducted on approval. So for decline, we just update the status.
+            await updateDoc(withdrawalRef, { status: newStatus });
+            toast({ title: 'Withdrawal Declined', description: 'The withdrawal request has been declined.' });
         }
     } catch (error) {
         console.error("Error processing withdrawal: ", error);

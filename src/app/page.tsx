@@ -88,6 +88,7 @@ export default function DashboardPage() {
   const [matchTitle, setMatchTitle] = useState('');
   const [entryFee, setEntryFee] = useState('');
 
+  const [withdrawError, setWithdrawError] = useState('');
 
   useEffect(() => {
     if (!loading && !user) {
@@ -104,6 +105,23 @@ export default function DashboardPage() {
       return () => matchesUnsub();
     }
   }, [user]);
+  
+    useEffect(() => {
+    if (user && withdrawAmount) {
+      const amount = Number(withdrawAmount);
+      if (amount > user.balance) {
+        setWithdrawError(`You cannot withdraw more than your balance of ${user.balance}৳.`);
+      } else if (amount <= 0) {
+        setWithdrawError('Withdrawal amount must be positive.');
+      }
+      else {
+        setWithdrawError('');
+      }
+    } else {
+        setWithdrawError('');
+    }
+  }, [withdrawAmount, user]);
+
 
   if (loading || !user) {
     return (
@@ -149,13 +167,14 @@ export default function DashboardPage() {
     // setDepositScreenshot(null);
     setWithdrawAmount('');
     setWithdrawBkash('');
+    setWithdrawError('');
     setMatchTitle('');
     setEntryFee('');
   }
   
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || withdrawError) return;
     setIsSubmitting(true);
 
     try {
@@ -168,7 +187,20 @@ export default function DashboardPage() {
                 status: 'pending',
                 timestamp: Date.now(),
             });
+             await addDoc(collection(db, 'withdrawals'), {
+                userId: user.uid,
+                amount: Number(withdrawAmount),
+                bkashNumber: withdrawBkash,
+                status: 'pending',
+                timestamp: Date.now(),
+            });
         } else if (openDialog === 'withdraw') {
+             // Redundant check, but good for safety
+            if (Number(withdrawAmount) > user.balance) {
+                 toast({ title: "Error", description: "Insufficient balance.", variant: "destructive"});
+                 setIsSubmitting(false);
+                 return;
+            }
              await addDoc(collection(db, 'withdrawals'), {
                 userId: user.uid,
                 amount: Number(withdrawAmount),
@@ -437,7 +469,7 @@ export default function DashboardPage() {
                    <DialogDescription>
                     {openDialog === 'createMatch' && 'Set up a new match for others to join.'}
                     {openDialog === 'deposit' && 'Send bKash payment and submit details for verification.'}
-                    {openDialog === 'withdraw' && 'Request to withdraw your winnings to your bKash account.'}
+                    {openDialog === 'withdraw' && `Request to withdraw your winnings to your bKash account. Current Balance: ${user.balance}৳`}
                     {openDialog === 'suggestOpponents' && 'Based on your win/loss ratio, here are some suitable opponents.'}
                   </DialogDescription>
                 </DialogHeader>
@@ -474,6 +506,7 @@ export default function DashboardPage() {
                         <div className="grid gap-2">
                             <Label htmlFor="withdraw-amount">Amount (৳)</Label>
                             <Input id="withdraw-amount" placeholder="Enter amount to withdraw" type="number" required value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} />
+                             {withdrawError && <p className="text-sm text-red-600">{withdrawError}</p>}
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="bkash-number">Your bKash Number</Label>
@@ -524,7 +557,7 @@ export default function DashboardPage() {
                      <DialogFooter>
                         <Button variant="outline" onClick={closeDialog} type="button">Cancel</Button>
                          {openDialog !== 'suggestOpponents' ? (
-                            <Button type="submit" disabled={isSubmitting}>
+                            <Button type="submit" disabled={isSubmitting || !!withdrawError}>
                                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 {openDialog === 'createMatch' ? 'Create Match' : 'Submit for Approval'}
                             </Button>
