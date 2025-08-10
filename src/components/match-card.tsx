@@ -67,6 +67,11 @@ export function MatchCard({ match }: MatchCardProps) {
                 throw new Error(`Insufficient funds. You need ${match.entryFee}৳ to join.`);
             }
 
+            // Deduct balance
+            const newBalance = currentBalance - match.entryFee;
+            transaction.update(userRef, { balance: newBalance });
+
+            // Add player to match
             const newPlayer: PlayerRef = { uid: user.uid, username: user.username, profilePic: user.profilePic };
             const updatedPlayers = [...currentMatch.players, newPlayer];
             

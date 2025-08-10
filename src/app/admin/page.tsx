@@ -200,18 +200,8 @@ export default function AdminPage() {
 
     try {
         if (newStatus === 'approved') {
-            await runTransaction(db, async (transaction) => {
-                const userDoc = await transaction.get(userRef);
-                if (!userDoc.exists()) throw new Error("User not found!");
-                
-                const currentBalance = userDoc.data().balance || 0;
-                if (currentBalance < withdrawal.amount) throw new Error("User has insufficient funds.");
-                const newBalance = currentBalance - withdrawal.amount;
-
-                transaction.update(userRef, { balance: newBalance });
-                transaction.update(withdrawalRef, { status: newStatus, handledBy: user?.uid });
-            });
-            toast({ title: 'Withdrawal Approved', description: 'User balance deducted. Send payment manually.', className: 'bg-green-600 text-white' });
+            await updateDoc(withdrawalRef, { status: newStatus, handledBy: user?.uid });
+            toast({ title: 'Withdrawal Approved', description: 'User balance not changed. Send payment manually.', className: 'bg-green-600 text-white' });
         } else {
             // If declined, refund the money to user's balance
              await runTransaction(db, async (transaction) => {
@@ -299,17 +289,44 @@ export default function AdminPage() {
 
   const handleDeleteMatch = async (matchId: string) => {
     setIsSubmitting(prev => ({...prev, [`delete-${matchId}`]: true}));
+    
     const matchRef = doc(db, 'matches', matchId);
+
     try {
-      await deleteDoc(matchRef);
+      await runTransaction(db, async (transaction) => {
+        const matchDoc = await transaction.get(matchRef);
+        if (!matchDoc.exists()) {
+          throw new Error("Match not found!");
+        }
+
+        const matchData = matchDoc.data() as Match;
+
+        // If the match is open, refund all players
+        if (matchData.status === 'open') {
+          const entryFee = matchData.entryFee;
+          for (const player of matchData.players) {
+            const playerRef = doc(db, 'users', player.uid);
+            const playerDoc = await transaction.get(playerRef);
+            if (playerDoc.exists()) {
+              const currentBalance = playerDoc.data().balance || 0;
+              const newBalance = currentBalance + entryFee;
+              transaction.update(playerRef, { balance: newBalance });
+            }
+          }
+        }
+        // Finally, delete the match document itself
+        transaction.delete(matchRef);
+      });
+
       toast({
         title: 'Match Deleted',
-        description: 'The match has been removed from the list.',
+        description: 'The match has been removed and any entry fees refunded.',
         className: 'bg-green-600 text-white'
       });
+
     } catch (error) {
       console.error("Error deleting match:", error);
-      toast({ title: 'Error', description: 'Could not delete the match.', variant: 'destructive' });
+      toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' });
     } finally {
       setIsSubmitting(prev => ({...prev, [`delete-${matchId}`]: false}));
     }
@@ -452,8 +469,8 @@ export default function AdminPage() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the match
-                          and remove it from the database.
+                          This action cannot be undone. This will permanently delete the match. 
+                          If the match is 'open', player entry fees will be refunded automatically.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>

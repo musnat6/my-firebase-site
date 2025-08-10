@@ -251,19 +251,34 @@ export default function DashboardPage() {
 
       } else if (openDialog === 'createMatch') {
         const entryFeeNumber = Number(entryFee);
-        if (entryFeeNumber > user.balance) {
-            throw new Error('Entry fee cannot exceed your balance.');
-        }
+        const userRef = doc(db, 'users', user.uid);
+        
+        await runTransaction(db, async (transaction) => {
+            const userDoc = await transaction.get(userRef);
+            if (!userDoc.exists()) {
+                throw new Error("User not found!");
+            }
+            const currentBalance = userDoc.data().balance || 0;
+            if (currentBalance < entryFeeNumber) {
+                throw new Error('Entry fee cannot exceed your balance.');
+            }
 
-        await addDoc(collection(db, 'matches'), {
-          title: matchTitle,
-          description: matchDescription,
-          entryFee: entryFeeNumber,
-          type: '1v1',
-          status: 'open',
-          players: [{ uid: user.uid, username: user.username, profilePic: user.profilePic }],
-          createdAt: Date.now(),
-          resultSubmissions: {},
+            // Deduct balance
+            const newBalance = currentBalance - entryFeeNumber;
+            transaction.update(userRef, { balance: newBalance });
+
+            // Create match
+            const matchesRef = collection(db, 'matches');
+            transaction.set(doc(matchesRef), {
+                title: matchTitle,
+                description: matchDescription,
+                entryFee: entryFeeNumber,
+                type: '1v1',
+                status: 'open',
+                players: [{ uid: user.uid, username: user.username, profilePic: user.profilePic }],
+                createdAt: Date.now(),
+                resultSubmissions: {},
+            });
         });
       }
 
