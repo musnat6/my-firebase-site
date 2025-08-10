@@ -20,15 +20,15 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { User } from '@/types';
+import type { User } from '@/types';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signUpWithEmail(email: string, password: string, username: string): Promise<void>;
-  signInWithEmail(email: string, password: string): Promise<void>;
-  signInWithGoogle(): Promise<void>;
-  signOut(): Promise<void>;
+  signUpWithEmail: (email: string, password: string, username: string) => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
