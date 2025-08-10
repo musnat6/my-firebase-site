@@ -6,12 +6,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db } from '@/lib/firebase';
-import type { Match, User, ResultSubmission } from '@/types';
+import type { Match, User, ResultSubmission, PlayerRef } from '@/types';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Swords, Trophy, Upload, Home, ArrowLeft } from 'lucide-react';
+import { Loader2, Swords, Upload, Home, ArrowLeft, UserX } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,7 +23,7 @@ function ResultSubmissionCard({
     user,
 }: { 
     match: Match, 
-    player: NonNullable<Match['players'][0]>, 
+    player: PlayerRef, 
     user: User 
 }) {
     const { toast } = useToast();
@@ -70,7 +70,6 @@ function ResultSubmissionCard({
             toast({ title: 'Result Submitted', description: 'Your result has been submitted for admin review.', className: 'bg-green-600 text-white' });
 
         } catch (error) {
-            console.error('Error submitting result:', error);
             let errorMessage = "An unknown error occurred during submission.";
             if (error instanceof Error) {
                 errorMessage = error.message;
@@ -96,9 +95,9 @@ function ResultSubmissionCard({
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <p className="text-sm">Submitted at: {new Date(playerSubmission.submittedAt).toLocaleString()}</p>
-                    <a href={playerSubmission.screenshotUrl} target="_blank" rel="noopener noreferrer">
-                        <Button variant="secondary">View Screenshot</Button>
-                    </a>
+                    <Button asChild variant="secondary">
+                      <a href={playerSubmission.screenshotUrl} target="_blank" rel="noopener noreferrer">View Screenshot</a>
+                    </Button>
                 </CardContent>
             </Card>
         )
@@ -211,14 +210,15 @@ export default function MatchDetailPage() {
                     <CardDescription>{match.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex items-center justify-around">
-                        {match.players.map((player) => (
-                            <div key={player.uid} className="flex flex-col items-center gap-2">
+                     <div className="flex items-center justify-around">
+                        {match.players.map((p, index) => (
+                           <div key={p.uid} className="flex flex-col items-center gap-2">
                                 <Avatar className="h-20 w-20 border-4 border-primary/20">
-                                    <AvatarImage src={player.profilePic} alt={player.username} />
-                                    <AvatarFallback>{player.username ? player.username.charAt(0) : 'P'}</AvatarFallback>
+                                    <AvatarImage src={p.profilePic} alt={p.username} />
+                                    <AvatarFallback>{p.username ? p.username.charAt(0) : 'P'}</AvatarFallback>
                                 </Avatar>
-                                <span className="font-bold text-lg">{player.username || 'Player'}</span>
+                                <span className="font-bold text-lg">{p.username || 'Player'}</span>
+                                { (index === 0 && match.players.length > 1) && <Swords className="h-12 w-12 text-muted-foreground absolute" />}
                             </div>
                         ))}
                          {match.players.length === 1 && (
@@ -239,11 +239,10 @@ export default function MatchDetailPage() {
             </Card>
 
             {userIsInMatch && isMatchInProgress && (
-                <div className="grid md:grid-cols-2 gap-6">
-                    <ResultSubmissionCard match={match} player={player1} user={user} />
-                    {player2 ? (
-                        <ResultSubmissionCard match={match} player={player2} user={user} />
-                    ) : null}
+                 <div className="grid md:grid-cols-2 gap-6">
+                    {match.players.map(player => (
+                        <ResultSubmissionCard key={player.uid} match={match} player={player} user={user} />
+                    ))}
                 </div>
             )}
         </main>
