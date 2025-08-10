@@ -17,18 +17,21 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Chrome } from 'lucide-react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { signInWithEmail, signInWithGoogle } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await signInWithEmail(email, password);
       toast({ title: 'Login Successful', description: 'Welcome back!' });
+      router.push('/');
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -42,6 +45,7 @@ export default function LoginPage() {
     try {
       await signInWithGoogle();
       toast({ title: 'Login Successful', description: 'Welcome!' });
+      router.push('/');
     } catch (error) {
       toast({
         variant: 'destructive',

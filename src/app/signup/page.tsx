@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Chrome } from 'lucide-react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -24,6 +25,7 @@ export default function SignupPage() {
   const [username, setUsername] = useState('');
   const { signUpWithEmail, signInWithGoogle } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +40,7 @@ export default function SignupPage() {
     try {
       await signUpWithEmail(email, password, username);
       toast({ title: 'Sign Up Successful', description: "Welcome to Arena Clash!" });
+      router.push('/');
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -51,6 +54,7 @@ export default function SignupPage() {
     try {
       await signInWithGoogle();
       toast({ title: 'Sign Up Successful', description: 'Welcome!' });
+      router.push('/');
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -136,4 +140,3 @@ export default function SignupPage() {
     </div>
   );
 }
-
