@@ -58,16 +58,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { mockMatches, mockLeaderboard } from '@/lib/data';
+import { mockLeaderboard } from '@/lib/data';
 import { MatchCard } from '@/components/match-card';
 import { UserNav } from '@/components/user-nav';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { addDoc, collection } from 'firebase/firestore';
+import { addDoc, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import type { Match } from '@/types';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
@@ -75,14 +75,18 @@ export default function DashboardPage() {
   const { toast } = useToast();
   const [openDialog, setOpenDialog] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [matches, setMatches] = useState<Match[]>([]);
 
   // Form states
   const [depositAmount, setDepositAmount] = useState('');
   const [depositTxId, setDepositTxId] = useState('');
-  const [depositScreenshot, setDepositScreenshot] = useState<File | null>(null);
+  // const [depositScreenshot, setDepositScreenshot] = useState<File | null>(null);
 
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawBkash, setWithdrawBkash] = useState('');
+  
+  const [matchTitle, setMatchTitle] = useState('');
+  const [entryFee, setEntryFee] = useState('');
 
 
   useEffect(() => {
@@ -90,6 +94,16 @@ export default function DashboardPage() {
       router.push('/login');
     }
   }, [user, loading, router]);
+  
+  useEffect(() => {
+    if (user) {
+      const matchesUnsub = onSnapshot(collection(db, 'matches'), (snapshot) => {
+        setMatches(snapshot.docs.map(doc => ({ matchId: doc.id, ...doc.data() } as Match)));
+      });
+
+      return () => matchesUnsub();
+    }
+  }, [user]);
 
   if (loading || !user) {
     return (
@@ -132,9 +146,11 @@ export default function DashboardPage() {
     // Reset form fields
     setDepositAmount('');
     setDepositTxId('');
-    setDepositScreenshot(null);
+    // setDepositScreenshot(null);
     setWithdrawAmount('');
     setWithdrawBkash('');
+    setMatchTitle('');
+    setEntryFee('');
   }
   
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -144,22 +160,11 @@ export default function DashboardPage() {
 
     try {
         if (openDialog === 'deposit') {
-            // Temporarily disable screenshot upload to fix hanging issue
-            // if (!depositScreenshot) {
-            //     toast({ title: "Screenshot required", description: "Please upload a screenshot.", variant: "destructive" });
-            //     setIsSubmitting(false);
-            //     return;
-            // }
-            // const storage = getStorage();
-            // const screenshotRef = ref(storage, `deposits/${user.uid}/${Date.now()}_${depositScreenshot.name}`);
-            // const uploadResult = await uploadBytes(screenshotRef, depositScreenshot);
-            // const screenshotUrl = await getDownloadURL(uploadResult.ref);
-
             await addDoc(collection(db, 'deposits'), {
                 userId: user.uid,
                 amount: Number(depositAmount),
                 txId: depositTxId,
-                screenshotUrl: "disabled_for_now", // screenshotUrl,
+                screenshotUrl: "disabled_for_now", // Temporarily disabled
                 status: 'pending',
                 timestamp: Date.now(),
             });
@@ -171,11 +176,20 @@ export default function DashboardPage() {
                 status: 'pending',
                 timestamp: Date.now(),
             });
+        } else if (openDialog === 'createMatch') {
+             await addDoc(collection(db, 'matches'), {
+                title: matchTitle,
+                entryFee: Number(entryFee),
+                type: '1v1', // For now, default to 1v1
+                status: 'open',
+                players: [user.uid], // Creator is the first player
+                createdAt: Date.now(),
+            });
         }
         
         toast({
           title: "Success!",
-          description: "Your request has been submitted and is pending approval."
+          description: "Your request has been submitted successfully."
         });
         closeDialog();
 
@@ -363,7 +377,7 @@ export default function DashboardPage() {
               </TabsList>
               <TabsContent value="matches">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {mockMatches.map((match) => (
+                  {matches.map((match) => (
                     <MatchCard key={match.matchId} match={match} />
                   ))}
                 </div>
@@ -456,8 +470,8 @@ export default function DashboardPage() {
                             <Input id="trxId" placeholder="e.g., 9C7B8A1D2E" required value={depositTxId} onChange={(e) => setDepositTxId(e.target.value)} />
                         </div>
                          <div className="grid gap-2">
-                            <Label htmlFor="screenshot">Screenshot (Optional for now)</Label>
-                            <Input id="screenshot" type="file" onChange={(e) => setDepositScreenshot(e.target.files ? e.target.files[0] : null)} />
+                            <Label htmlFor="screenshot">Screenshot (Temporarily Disabled)</Label>
+                            <Input id="screenshot" type="file" disabled />
                         </div>
                         </>
                     )}
@@ -481,11 +495,11 @@ export default function DashboardPage() {
                         <>
                         <div className="grid gap-2">
                             <Label htmlFor="title">Match Title</Label>
-                            <Input id="title" placeholder="e.g., Weekend Warriors" required />
+                            <Input id="title" placeholder="e.g., Weekend Warriors" required value={matchTitle} onChange={(e) => setMatchTitle(e.target.value)} />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="entry-fee">Entry Fee (minimum 50৳)</Label>
-                            <Input id="entry-fee" placeholder="50" type="number" min="50" required />
+                            <Input id="entry-fee" placeholder="50" type="number" min="50" required value={entryFee} onChange={(e) => setEntryFee(e.target.value)} />
                         </div>
                         </>
                     )}
@@ -518,7 +532,7 @@ export default function DashboardPage() {
                          {openDialog !== 'suggestOpponents' ? (
                             <Button type="submit" disabled={isSubmitting}>
                                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Submit for Approval
+                                {openDialog === 'createMatch' ? 'Create Match' : 'Submit for Approval'}
                             </Button>
                          ) : (
                             <Button onClick={closeDialog} type="button">Close</Button>
