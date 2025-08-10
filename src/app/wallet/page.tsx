@@ -27,14 +27,12 @@ export default function WalletPage() {
 
         const depositsQuery = query(
             collection(db, 'deposits'),
-            where('userId', '==', user.uid),
-            orderBy('timestamp', 'desc')
+            where('userId', '==', user.uid)
         );
         
         const withdrawalsQuery = query(
             collection(db, 'withdrawals'),
-            where('userId', '==', user.uid),
-            orderBy('timestamp', 'desc')
+            where('userId', '==', user.uid)
         );
 
         const unsubDeposits = onSnapshot(depositsQuery, (snapshot) => {
