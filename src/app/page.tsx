@@ -11,7 +11,6 @@ import {
   Landmark,
   PlusCircle,
   Swords,
-  Trophy,
   Users,
   Wallet,
   Crown,
@@ -57,10 +56,11 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Match } from '@/types';
 import { LeaderboardTable } from '@/components/leaderboard-table';
 import { useUserMatches } from '@/hooks/use-user-matches';
 import { suggestOpponents, SuggestOpponentsOutput } from '@/ai/flows/suggest-opponents';
+import { generateMatchDescription, GenerateMatchDescriptionOutput } from '@/ai/flows/generate-match-description';
+import { Textarea } from '@/components/ui/textarea';
 
 
 export default function DashboardPage() {
@@ -80,7 +80,9 @@ export default function DashboardPage() {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawBkash, setWithdrawBkash] = useState('');
   const [matchTitle, setMatchTitle] = useState('');
+  const [matchDescription, setMatchDescription] = useState('');
   const [entryFee, setEntryFee] = useState('');
+  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
   const [withdrawError, setWithdrawError] = useState('');
 
   useEffect(() => {
@@ -103,11 +105,32 @@ export default function DashboardPage() {
       setWithdrawError('');
     }
   }, [withdrawAmount, user]);
+  
+  const handleGenerateDescription = async () => {
+    if (!entryFee) {
+        toast({ title: 'Entry Fee Required', description: 'Please enter an entry fee first.', variant: 'destructive' });
+        return;
+    }
+    setIsGeneratingDesc(true);
+    try {
+        const result = await generateMatchDescription({
+            entryFee: Number(entryFee),
+            gameType: '1v1', // This can be dynamic in the future
+        });
+        setMatchDescription(result.description);
+    } catch (error) {
+        console.error("Error generating match description:", error);
+        toast({ title: 'Error', description: 'Could not generate a description.', variant: 'destructive' });
+    } finally {
+        setIsGeneratingDesc(false);
+    }
+  };
+
 
   if (loading || !user) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
@@ -142,6 +165,7 @@ export default function DashboardPage() {
     setWithdrawBkash('');
     setWithdrawError('');
     setMatchTitle('');
+    setMatchDescription('');
     setEntryFee('');
     setOpponentSuggestions([]);
   };
@@ -155,9 +179,10 @@ export default function DashboardPage() {
       if (openDialog === 'deposit') {
         await addDoc(collection(db, 'deposits'), {
           userId: user.uid,
+          username: user.username,
           amount: Number(depositAmount),
           txId: depositTxId,
-          screenshotUrl: 'disabled_for_now', // Screenshot upload disabled
+          screenshotUrl: 'disabled_for_now',
           status: 'pending',
           timestamp: Date.now(),
         });
@@ -169,6 +194,7 @@ export default function DashboardPage() {
         }
         await addDoc(collection(db, 'withdrawals'), {
           userId: user.uid,
+          username: user.username,
           amount: Number(withdrawAmount),
           bkashNumber: withdrawBkash,
           status: 'pending',
@@ -177,10 +203,11 @@ export default function DashboardPage() {
       } else if (openDialog === 'createMatch') {
         await addDoc(collection(db, 'matches'), {
           title: matchTitle,
+          description: matchDescription,
           entryFee: Number(entryFee),
           type: '1v1',
           status: 'open',
-          players: [user.uid],
+          players: [{ uid: user.uid, username: user.username, profilePic: user.profilePic }],
           createdAt: Date.now(),
         });
       }
@@ -188,6 +215,7 @@ export default function DashboardPage() {
       toast({
         title: 'Success!',
         description: 'Your request has been submitted successfully.',
+        className: 'bg-green-600 text-white'
       });
       closeDialog();
     } catch (error) {
@@ -203,8 +231,7 @@ export default function DashboardPage() {
   };
   
   const navigate = (path: string) => {
-    setActiveTab(path);
-    router.push(`/${path}`);
+    router.push(path.startsWith('/') ? path : `/${path}`);
   };
 
   return (
@@ -220,32 +247,32 @@ export default function DashboardPage() {
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton isActive={activeTab === 'home'} onClick={() => router.push('/')}>
+                <SidebarMenuButton isActive={activeTab === 'home'} onClick={() => navigate('/')} tooltip="Dashboard">
                   <Home />
                   <span>Home</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton isActive={activeTab === 'matches'} onClick={() => navigate('matches')}>
+                <SidebarMenuButton onClick={() => navigate('matches')} tooltip="All Matches">
                   <Swords />
                   <span>Matches</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton isActive={activeTab === 'leaderboard'} onClick={() => navigate('leaderboard')}>
+                <SidebarMenuButton onClick={() => navigate('leaderboard')} tooltip="Leaderboard">
                   <BarChart />
                   <span>Leaderboard</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton isActive={activeTab === 'wallet'} onClick={() => navigate('wallet')}>
+                <SidebarMenuButton onClick={() => navigate('wallet')} tooltip="My Wallet">
                   <Wallet />
                   <span>Wallet</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               {user.role === 'admin' && (
                 <SidebarMenuItem>
-                  <SidebarMenuButton onClick={() => router.push('/admin')}>
+                  <SidebarMenuButton onClick={() => navigate('admin')} tooltip="Admin Panel">
                     <ShieldCheck />
                     <span>Admin Panel</span>
                   </SidebarMenuButton>
@@ -254,12 +281,12 @@ export default function DashboardPage() {
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter>
-            <Card>
-              <CardHeader>
+            <Card className="bg-muted border-none shadow-inner">
+              <CardHeader className="p-4">
                 <CardTitle>Need Help?</CardTitle>
                 <CardDescription>Contact support for any issues.</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 pt-0">
                 <Button size="sm" className="w-full">
                   Contact Support
                 </Button>
@@ -285,7 +312,7 @@ export default function DashboardPage() {
             </div>
           </header>
 
-          <main className="flex-1 space-y-6 p-4 md:p-6">
+          <main className="flex-1 space-y-6 p-4 md:p-6 bg-muted/40">
             <section className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -370,7 +397,7 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {matches.map((match) => (
+                    {matches.slice(0, 4).map((match) => (
                       <MatchCard key={match.matchId} match={match} />
                     ))}
                   </div>
@@ -442,6 +469,16 @@ export default function DashboardPage() {
                             <Label htmlFor="entry-fee">Entry Fee (minimum 50৳)</Label>
                             <Input id="entry-fee" placeholder="50" type="number" min="50" required value={entryFee} onChange={(e) => setEntryFee(e.target.value)} />
                         </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="description">Match Description</Label>
+                            <div className="relative">
+                                <Textarea id="description" placeholder="A short, exciting description..." required value={matchDescription} onChange={(e) => setMatchDescription(e.target.value)} rows={3}/>
+                                <Button type="button" size="sm" variant="outline" onClick={handleGenerateDescription} disabled={isGeneratingDesc || !entryFee} className="absolute bottom-2 right-2">
+                                     {isGeneratingDesc && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    AI Gen
+                                </Button>
+                            </div>
+                        </div>
                         </>
                     )}
                     {openDialog === 'suggestOpponents' && (
@@ -493,5 +530,3 @@ export default function DashboardPage() {
     </SidebarProvider>
   );
 }
-
-    

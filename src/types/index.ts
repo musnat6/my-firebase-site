@@ -1,3 +1,10 @@
+
+export interface PlayerRef {
+    uid: string;
+    username: string;
+    profilePic: string;
+}
+
 export interface User {
   uid: string;
   username: string;
@@ -15,11 +22,12 @@ export interface User {
 export interface Match {
   matchId: string;
   title: string;
+  description: string;
   type: '1v1' | 'Mini Tournament';
   entryFee: number;
-  players: string[]; // array of user uids
+  players: PlayerRef[]; // array of player objects
   status: 'open' | 'inprogress' | 'pending_confirmation' | 'completed' | 'disputed';
-  winnerId?: string;
+  winner?: PlayerRef;
   proofUrl?: string;
   dispute?: {
     reportedBy: string;
@@ -41,18 +49,22 @@ export interface LeaderboardEntry {
 export interface Deposit {
   depositId: string;
   userId: string;
+  username: string;
   amount: number;
   txId: string;
   screenshotUrl: string;
   status: 'pending' | 'approved' | 'declined';
   timestamp: number;
+  handledBy?: string;
 }
 
 export interface Withdrawal {
   withdrawalId: string;
   userId: string;
+  username: string;
   amount: number;
   bkashNumber: string;
   status: 'pending' | 'approved' | 'declined';
   timestamp: number;
+  handledBy?: string;
 }

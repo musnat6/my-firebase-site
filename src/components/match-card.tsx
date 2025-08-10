@@ -1,13 +1,13 @@
 
 'use client';
 
-import type { Match } from "@/types"
+import type { Match, PlayerRef } from "@/types"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Users, Swords, Gamepad2, Trophy, Loader2 } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
-import { doc, updateDoc, arrayUnion } from "firebase/firestore"
+import { doc, updateDoc, arrayUnion, runTransaction } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { useState } from "react"
@@ -39,27 +39,38 @@ export function MatchCard({ match }: MatchCardProps) {
       toast({ title: "Error", description: "You must be logged in to join.", variant: "destructive" });
       return;
     }
-    if (user.balance < match.entryFee) {
-        toast({ title: "Insufficient Funds", description: `You need ${match.entryFee}৳ to join this match.`, variant: "destructive" });
-        return;
-    }
-
+    
     setIsJoining(true);
     const matchRef = doc(db, 'matches', match.matchId);
+    const userRef = doc(db, 'users', user.uid);
+
     try {
-        await updateDoc(matchRef, {
-            players: arrayUnion(user.uid)
+        await runTransaction(db, async (transaction) => {
+            const userDoc = await transaction.get(userRef);
+            if (!userDoc.exists()) throw new Error("User not found!");
+
+            const matchDoc = await transaction.get(matchRef);
+            if (!matchDoc.exists()) throw new Error("Match not found!");
+
+            const currentBalance = userDoc.data().balance || 0;
+            if (currentBalance < match.entryFee) {
+                throw new Error(`Insufficient funds. You need ${match.entryFee}৳ to join.`);
+            }
+
+            const newPlayer: PlayerRef = { uid: user.uid, username: user.username, profilePic: user.profilePic };
+            transaction.update(matchRef, { players: arrayUnion(newPlayer) });
         });
-        toast({ title: "Successfully Joined!", description: "Good luck in your match." });
+
+        toast({ title: "Successfully Joined!", description: "Good luck in your match.", className: "bg-green-600 text-white" });
     } catch (error) {
         console.error("Error joining match:", error);
-        toast({ title: "Error", description: "Could not join the match. Please try again.", variant: "destructive" });
+        toast({ title: "Error Joining Match", description: (error as Error).message, variant: "destructive" });
     } finally {
         setIsJoining(false);
     }
   }
 
-  const userIsInMatch = user && match.players.includes(user.uid);
+  const userIsInMatch = user && match.players.some(p => p.uid === user.uid);
   const isFull = match.players.length >= (match.type === '1v1' ? 2 : 8);
 
   const getIcon = () => {
@@ -74,7 +85,7 @@ export function MatchCard({ match }: MatchCardProps) {
   }
 
   return (
-    <Card className="flex flex-col h-full hover:shadow-accent/20 hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+    <Card className="flex flex-col h-full hover:shadow-accent/20 hover:shadow-lg transition-shadow duration-300 overflow-hidden bg-card">
         <div className="aspect-video bg-muted/50 flex items-center justify-center">
             {getIcon()}
         </div>
@@ -89,8 +100,9 @@ export function MatchCard({ match }: MatchCardProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex-grow">
+        <p className="text-sm text-muted-foreground line-clamp-2">{match.description}</p>
       </CardContent>
-      <CardFooter className="flex-col items-stretch gap-2">
+      <CardFooter className="flex-col items-stretch gap-2 pt-4 border-t">
         <div className="text-center">
             <p className="text-sm text-muted-foreground">Entry Fee</p>
             <p className="text-2xl font-bold font-headline text-primary">{match.entryFee}৳</p>
@@ -108,5 +120,3 @@ export function MatchCard({ match }: MatchCardProps) {
     </Card>
   )
 }
-
-    

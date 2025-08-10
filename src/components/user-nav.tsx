@@ -12,14 +12,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { CreditCard, LogOut, Settings, User as UserIcon } from "lucide-react"
+import { LogOut, User as UserIcon, Moon, Sun, Wallet } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useTheme } from "next-themes"
 
 export function UserNav() {
   const { user, signOut } = useAuth();
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
 
   if (!user) {
     return (
@@ -39,8 +41,8 @@ export function UserNav() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
           <Avatar className="h-10 w-10 border-2 border-primary/50">
-            <AvatarImage src={user.profilePic} alt={user.username} data-ai-hint="avatar" />
-            <AvatarFallback className="font-bold bg-primary/20">{user.username.charAt(0)}</AvatarFallback>
+            <AvatarImage src={user.profilePic} alt={user.username} />
+            <AvatarFallback className="font-bold bg-primary/20">{user.username?.charAt(0)}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
@@ -59,13 +61,13 @@ export function UserNav() {
             <UserIcon className="mr-2 h-4 w-4" />
             <span>Profile</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => router.push('/billing')}>
-            <CreditCard className="mr-2 h-4 w-4" />
-            <span>Billing</span>
+          <DropdownMenuItem onClick={() => router.push('/wallet')}>
+            <Wallet className="mr-2 h-4 w-4" />
+            <span>Wallet</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => router.push('/settings')}>
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Settings</span>
+           <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+            {theme === 'dark' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+            <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
@@ -77,5 +79,3 @@ export function UserNav() {
     </DropdownMenu>
   )
 }
-
-    

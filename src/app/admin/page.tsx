@@ -4,11 +4,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -27,20 +22,26 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, CheckCircle, Clock } from 'lucide-react';
-import { collection, onSnapshot, doc, updateDoc, runTransaction, getFirestore } from 'firebase/firestore';
+import { AlertTriangle, CheckCircle, Clock, Loader2 } from 'lucide-react';
+import { collection, onSnapshot, doc, updateDoc, runTransaction, query, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Deposit, Withdrawal } from '@/types';
+import type { Deposit, Withdrawal, User, Match } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { DisputeSummarizer } from '@/components/dispute-summarizer';
-
+import { AdminDataTable } from '@/components/admin-data-table';
+import { useAllUsers } from '@/hooks/use-all-users';
 
 export default function AdminPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const { users, loading: usersLoading } = useAllUsers();
+
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
+
+  const [dataLoading, setDataLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -55,18 +56,27 @@ export default function AdminPage() {
   
   useEffect(() => {
     if (user && user.role === 'admin') {
-      const depositsUnsub = onSnapshot(collection(db, 'deposits'), (snapshot) => {
-        setDeposits(snapshot.docs.map(doc => ({ depositId: doc.id, ...doc.data() } as Deposit)));
-      });
+        setDataLoading(true);
+        const depositsUnsub = onSnapshot(query(collection(db, 'deposits'), orderBy('timestamp', 'desc')), (snapshot) => {
+            setDeposits(snapshot.docs.map(doc => ({ depositId: doc.id, ...doc.data() } as Deposit)));
+            setDataLoading(false);
+        });
 
-      const withdrawalsUnsub = onSnapshot(collection(db, 'withdrawals'), (snapshot) => {
-        setWithdrawals(snapshot.docs.map(doc => ({ withdrawalId: doc.id, ...doc.data() } as Withdrawal)));
-      });
+        const withdrawalsUnsub = onSnapshot(query(collection(db, 'withdrawals'), orderBy('timestamp', 'desc')), (snapshot) => {
+            setWithdrawals(snapshot.docs.map(doc => ({ withdrawalId: doc.id, ...doc.data() } as Withdrawal)));
+            setDataLoading(false);
+        });
 
-      return () => {
-        depositsUnsub();
-        withdrawalsUnsub();
-      };
+        const matchesUnsub = onSnapshot(query(collection(db, 'matches'), orderBy('createdAt', 'desc')), (snapshot) => {
+            setMatches(snapshot.docs.map(doc => ({ matchId: doc.id, ...doc.data() } as Match)));
+            setDataLoading(false);
+        });
+
+        return () => {
+            depositsUnsub();
+            withdrawalsUnsub();
+            matchesUnsub();
+        };
     }
   }, [user]);
 
@@ -86,11 +96,11 @@ export default function AdminPage() {
           }
           const newBalance = (userDoc.data().balance || 0) + deposit.amount;
           transaction.update(userRef, { balance: newBalance });
-          transaction.update(depositRef, { status: newStatus });
+          transaction.update(depositRef, { status: newStatus, handledBy: user?.uid });
         });
-        toast({ title: 'Deposit Approved', description: `User balance updated successfully.` });
+        toast({ title: 'Deposit Approved', description: `User balance updated successfully.`, className: 'bg-green-600 text-white' });
       } else {
-        await updateDoc(depositRef, { status: newStatus });
+        await updateDoc(depositRef, { status: newStatus, handledBy: user?.uid });
         toast({ title: 'Deposit Declined', variant: 'destructive' });
       }
     } catch (error) {
@@ -113,24 +123,19 @@ export default function AdminPage() {
         if (newStatus === 'approved') {
             await runTransaction(db, async (transaction) => {
                 const userDoc = await transaction.get(userRef);
-                if (!userDoc.exists()) {
-                    throw new Error("User not found!");
-                }
+                if (!userDoc.exists()) throw new Error("User not found!");
+                
                 const currentBalance = userDoc.data().balance || 0;
-                if (currentBalance < withdrawal.amount) {
-                    throw new Error("User has insufficient funds for this withdrawal.");
-                }
+                if (currentBalance < withdrawal.amount) throw new Error("User has insufficient funds.");
+
                 const newBalance = currentBalance - withdrawal.amount;
                 transaction.update(userRef, { balance: newBalance });
-                transaction.update(withdrawalRef, { status: newStatus });
+                transaction.update(withdrawalRef, { status: newStatus, handledBy: user?.uid });
             });
-            toast({ title: 'Withdrawal Approved', description: 'User balance has been deducted. Remember to send the payment manually.' });
+            toast({ title: 'Withdrawal Approved', description: 'User balance deducted. Send payment manually.', className: 'bg-green-600 text-white' });
         } else {
-            // If declined, refund the amount to the user's balance. This logic was incorrect before.
-            // On second thought, if a pending withdrawal is declined, no balance change should have occurred yet.
-            // The balance is only deducted on approval. So for decline, we just update the status.
-            await updateDoc(withdrawalRef, { status: newStatus });
-            toast({ title: 'Withdrawal Declined', description: 'The withdrawal request has been declined.' });
+            await updateDoc(withdrawalRef, { status: newStatus, handledBy: user?.uid });
+            toast({ title: 'Withdrawal Declined', description: 'The withdrawal request has been declined.', variant: 'destructive' });
         }
     } catch (error) {
         console.error("Error processing withdrawal: ", error);
@@ -143,12 +148,12 @@ export default function AdminPage() {
 
   if (loading || !user || user.role !== 'admin') {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <p>Loading or unauthorized...</p>
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
-
+  
   const getStatusBadge = (status: 'pending' | 'approved' | 'declined') => {
     switch (status) {
       case 'pending':
@@ -160,116 +165,136 @@ export default function AdminPage() {
     }
   };
 
+  const depositsColumns = [
+    { accessorKey: 'username', header: 'User' },
+    { accessorKey: 'amount', header: 'Amount (৳)' },
+    { accessorKey: 'txId', header: 'Transaction ID' },
+    { id: 'status', header: 'Status', cell: (info: any) => getStatusBadge(info.row.original.status as any) },
+    { id: 'screenshot', header: 'Screenshot', cell: (info: any) => <Button variant="outline" size="sm" onClick={() => window.open(info.row.original.screenshotUrl, '_blank')} disabled={info.row.original.screenshotUrl === 'disabled_for_now'}>View</Button> },
+    { id: 'actions', header: 'Actions', cell: (info: any) => {
+        const d = info.row.original;
+        return d.status === 'pending' && (
+         <div className="space-x-2">
+            <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleDepositAction(d.depositId, 'approved')} disabled={isSubmitting[d.depositId]}>Approve</Button>
+            <Button variant="destructive" size="sm" onClick={() => handleDepositAction(d.depositId, 'declined')} disabled={isSubmitting[d.depositId]}>Decline</Button>
+         </div>
+       )}
+    },
+  ];
+
+  const withdrawalsColumns = [
+    { accessorKey: 'username', header: 'User' },
+    { accessorKey: 'amount', header: 'Amount (৳)' },
+    { accessorKey: 'bkashNumber', header: 'bKash Number' },
+    { id: 'status', header: 'Status', cell: (info: any) => getStatusBadge(info.row.original.status as any) },
+    { id: 'actions', header: 'Actions', cell: (info: any) => {
+        const w = info.row.original;
+        return w.status === 'pending' && (
+         <div className="space-x-2">
+            <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleWithdrawalAction(w.withdrawalId, 'approved')} disabled={isSubmitting[w.withdrawalId]}>Approve</Button>
+            <Button variant="destructive" size="sm" onClick={() => handleWithdrawalAction(w.withdrawalId, 'declined')} disabled={isSubmitting[w.withdrawalId]}>Decline</Button>
+         </div>
+       )}
+    },
+  ];
+
+  const playersColumns = [
+    { accessorKey: 'username', header: 'Username' },
+    { accessorKey: 'email', header: 'Email' },
+    { accessorKey: 'balance', header: 'Balance (৳)' },
+    { accessorKey: 'stats.wins', header: 'Wins' },
+    { accessorKey: 'stats.losses', header: 'Losses' },
+    { accessorKey: 'stats.earnings', header: 'Earnings (৳)' },
+    { accessorKey: 'role', header: 'Role' },
+  ];
+
+  const matchesColumns = [
+    { accessorKey: 'title', header: 'Title' },
+    { accessorKey: 'entryFee', header: 'Fee (৳)' },
+    { id: 'players', header: 'Players', cell: (info: any) => `${info.row.original.players.length} / ${info.row.original.type === '1v1' ? 2 : 8}` },
+    { accessorKey: 'status', header: 'Status' },
+    { id: 'winner', header: 'Winner', cell: (info: any) => info.row.original.winner?.username || 'N/A'},
+  ];
+
+
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
-       <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6">
+       <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6">
             <h1 className="text-xl font-headline font-bold">Admin Panel</h1>
-             <Button onClick={() => router.push('/')}>Back to Site</Button>
+             <Button onClick={() => router.push('/')} variant="outline">Back to Site</Button>
         </header>
       <main className="flex-1 space-y-6 p-4 md:p-6">
-         <Alert>
+         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Admin Responsibility</AlertTitle>
           <AlertDescription>
-            You are responsible for manually verifying all transactions. Ensure you have received payment before approving deposits and sent payment before approving withdrawals.
+            You are responsible for all manual transactions. Verify payments before approving deposits and send payments before approving withdrawals.
           </AlertDescription>
         </Alert>
 
         <Tabs defaultValue="deposits">
-          <TabsList>
-            <TabsTrigger value="deposits">Deposit Approvals</TabsTrigger>
-            <TabsTrigger value="withdrawals">Withdrawal Approvals</TabsTrigger>
-            <TabsTrigger value="disputes">Dispute Resolution</TabsTrigger>
-            <TabsTrigger value="players" disabled>Player Management</TabsTrigger>
-            <TabsTrigger value="matches" disabled>Match History</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+            <TabsTrigger value="deposits">Deposits</TabsTrigger>
+            <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+            <TabsTrigger value="players">Players</TabsTrigger>
+            <TabsTrigger value="matches">Matches</TabsTrigger>
+            <TabsTrigger value="disputes">Disputes</TabsTrigger>
           </TabsList>
 
           <TabsContent value="deposits">
-            <Card>
-              <CardHeader>
-                <CardTitle>Pending Deposits</CardTitle>
-                <CardDescription>Review and approve or decline manual bKash deposits.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>User ID</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Transaction ID</TableHead>
-                      <TableHead>Status</TableHead>
-                       <TableHead>Screenshot</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {deposits.map((d) => (
-                      <TableRow key={d.depositId}>
-                        <TableCell className="font-code">{d.userId}</TableCell>
-                        <TableCell>{d.amount}৳</TableCell>
-                        <TableCell className="font-code">{d.txId}</TableCell>
-                        <TableCell>{getStatusBadge(d.status as any)}</TableCell>
-                         <TableCell><Button variant="outline" size="sm" onClick={() => window.open(d.screenshotUrl, '_blank')}>View</Button></TableCell>
-                        <TableCell className="space-x-2">
-                           {d.status === 'pending' && (
-                             <>
-                                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleDepositAction(d.depositId, 'approved')} disabled={isSubmitting[d.depositId]}>Approve</Button>
-                                <Button variant="destructive" size="sm" onClick={() => handleDepositAction(d.depositId, 'declined')} disabled={isSubmitting[d.depositId]}>Decline</Button>
-                             </>
-                           )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            <AdminDataTable
+              columns={depositsColumns}
+              data={deposits}
+              loading={dataLoading}
+              title="Deposit Approvals"
+              description="Review and approve or decline manual bKash deposits."
+              searchColumn="username"
+              searchText="Search by username..."
+            />
           </TabsContent>
 
           <TabsContent value="withdrawals">
-             <Card>
-              <CardHeader>
-                <CardTitle>Pending Withdrawals</CardTitle>
-                <CardDescription>Review and process player withdrawal requests.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>User ID</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>bKash Number</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {withdrawals.map((w) => (
-                      <TableRow key={w.withdrawalId}>
-                        <TableCell className="font-code">{w.userId}</TableCell>
-                        <TableCell>{w.amount}৳</TableCell>
-                        <TableCell className="font-code">{w.bkashNumber}</TableCell>
-                        <TableCell>{getStatusBadge(w.status as any)}</TableCell>
-                        <TableCell className="space-x-2">
-                           {w.status === 'pending' && (
-                             <>
-                                <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleWithdrawalAction(w.withdrawalId, 'approved')} disabled={isSubmitting[w.withdrawalId]}>Approve</Button>
-                                <Button variant="destructive" size="sm" onClick={() => handleWithdrawalAction(w.withdrawalId, 'declined')} disabled={isSubmitting[w.withdrawalId]}>Decline</Button>
-                             </>
-                           )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            <AdminDataTable
+                columns={withdrawalsColumns}
+                data={withdrawals}
+                loading={dataLoading}
+                title="Withdrawal Approvals"
+                description="Review and process player withdrawal requests."
+                searchColumn="username"
+                searchText="Search by username..."
+              />
           </TabsContent>
-            <TabsContent value="disputes">
-                <DisputeSummarizer />
-            </TabsContent>
+
+          <TabsContent value="players">
+              <AdminDataTable
+                  columns={playersColumns}
+                  data={users}
+                  loading={usersLoading}
+                  title="Player Management"
+                  description="View and manage all registered players."
+                  searchColumn="username"
+                  searchText="Search by username..."
+                />
+          </TabsContent>
+
+          <TabsContent value="matches">
+              <AdminDataTable
+                  columns={matchesColumns}
+                  data={matches}
+                  loading={dataLoading}
+                  title="Match History"
+                  description="View all created matches."
+                  searchColumn="title"
+                  searchText="Search by title..."
+                />
+          </TabsContent>
+
+          <TabsContent value="disputes">
+              <DisputeSummarizer />
+          </TabsContent>
         </Tabs>
       </main>
     </div>
   );
 }
+
