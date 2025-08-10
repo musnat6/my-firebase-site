@@ -234,7 +234,7 @@ export default function MatchDetailPage() {
                         {match.players.map((player) => (
                             <div key={player.uid} className="flex flex-col items-center gap-2">
                                 <Avatar className="h-20 w-20 border-4 border-primary/20">
-                                    <AvatarImage src={player.profilePic} alt={player.username || 'Player'} />
+                                    <AvatarImage src={player.profilePic} alt={player.username} />
                                     <AvatarFallback>{player.username ? player.username.charAt(0) : 'P'}</AvatarFallback>
                                 </Avatar>
                                 <span className="font-bold text-lg">{player.username || 'Player'}</span>
