@@ -13,17 +13,10 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -31,10 +24,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, CheckCircle, Clock, Loader2, Save, Trophy } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, Loader2, Save, Trophy, UserX } from 'lucide-react';
 import { collection, onSnapshot, doc, updateDoc, runTransaction, query, orderBy, getDocs, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Deposit, Withdrawal, User, Match, PaymentSettings } from '@/types';
+import type { Deposit, Withdrawal, User, Match, PlayerRef, PaymentSettings } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { DisputeSummarizer } from '@/components/dispute-summarizer';
 import { AdminDataTable } from '@/components/admin-data-table';
@@ -200,18 +193,25 @@ export default function AdminPage() {
                 const userDoc = await transaction.get(userRef);
                 if (!userDoc.exists()) throw new Error("User not found!");
                 
+                // Balance is now correctly handled in the withdrawal request dialog.
+                // Re-checking here is good practice for security.
                 const currentBalance = userDoc.data().balance || 0;
                 if (currentBalance < withdrawal.amount) throw new Error("User has insufficient funds.");
 
-                const newBalance = currentBalance - withdrawal.amount;
-                transaction.update(userRef, { balance: newBalance });
                 transaction.update(withdrawalRef, { status: newStatus, handledBy: user?.uid });
             });
             toast({ title: 'Withdrawal Approved', description: 'User balance deducted. Send payment manually.', className: 'bg-green-600 text-white' });
         } else {
             // If declined, refund the money to user's balance
-            await updateDoc(withdrawalRef, { status: newStatus, handledBy: user?.uid });
-            toast({ title: 'Withdrawal Declined', description: 'The withdrawal request has been declined.', variant: 'destructive' });
+             await runTransaction(db, async (transaction) => {
+                const userDoc = await transaction.get(userRef);
+                if (!userDoc.exists()) throw new Error("User not found!");
+                const newBalance = (userDoc.data().balance || 0) + withdrawal.amount;
+                transaction.update(userRef, { balance: newBalance });
+                transaction.update(withdrawalRef, { status: newStatus, handledBy: user?.uid });
+             });
+
+            toast({ title: 'Withdrawal Declined', description: 'The withdrawal has been declined and funds returned to the user.', variant: 'destructive' });
         }
     } catch (error) {
         console.error("Error processing withdrawal: ", error);
@@ -220,6 +220,72 @@ export default function AdminPage() {
         setIsSubmitting(prev => ({ ...prev, [withdrawalId]: false }));
     }
   };
+  
+   const handleDeclareWinner = async (matchId: string, winner: PlayerRef, players: PlayerRef[], entryFee: number) => {
+    const submittingKey = `${matchId}-${winner.uid}`;
+    setIsSubmitting(prev => ({ ...prev, [submittingKey]: true }));
+
+    const matchRef = doc(db, 'matches', matchId);
+    const winnerRef = doc(db, 'users', winner.uid);
+
+    try {
+        await runTransaction(db, async (transaction) => {
+            const winnerDoc = await transaction.get(winnerRef);
+            if (!winnerDoc.exists()) {
+                throw new Error(`Winner (${winner.username}) not found!`);
+            }
+            
+            const prizePool = entryFee * players.length;
+            const commission = prizePool * 0.10; // 10% commission
+            const winnerPrize = prizePool - commission;
+
+            const currentBalance = winnerDoc.data().balance || 0;
+            const newBalance = currentBalance + winnerPrize;
+
+            const currentStats = winnerDoc.data().stats || { wins: 0, losses: 0, earnings: 0 };
+            const newStats = { 
+                ...currentStats,
+                wins: currentStats.wins + 1,
+                earnings: currentStats.earnings + winnerPrize,
+            };
+
+            // Update winner's balance and stats
+            transaction.update(winnerRef, { 
+                balance: newBalance,
+                stats: newStats,
+            });
+
+            // Update stats for all other players (as losses)
+            for (const player of players) {
+                if (player.uid !== winner.uid) {
+                    const loserRef = doc(db, 'users', player.uid);
+                    const loserDoc = await transaction.get(loserRef);
+                    if (loserDoc.exists()) {
+                         const currentLoserStats = loserDoc.data().stats || { wins: 0, losses: 0, earnings: 0 };
+                         const newLoserStats = { ...currentLoserStats, losses: currentLoserStats.losses + 1 };
+                         transaction.update(loserRef, { stats: newLoserStats });
+                    }
+                }
+            }
+            
+            // Update match status
+            transaction.update(matchRef, { status: 'completed', winner: winner });
+        });
+
+        toast({
+            title: 'Winner Declared!',
+            description: `${winner.username} has been awarded ${winnerPrize}৳.`,
+            className: 'bg-green-600 text-white'
+        });
+
+    } catch (error) {
+        console.error("Error declaring winner:", error);
+        toast({ title: 'Error', description: (error as Error).message, variant: 'destructive' });
+    } finally {
+        setIsSubmitting(prev => ({ ...prev, [submittingKey]: false }));
+    }
+};
+
 
 
   if (loading || !user || user.role !== 'admin') {
@@ -246,7 +312,6 @@ export default function AdminPage() {
     { accessorKey: 'amount', header: 'Amount (৳)' },
     { accessorKey: 'txId', header: 'Transaction ID' },
     { id: 'status', header: 'Status', cell: (info: any) => getStatusBadge(info.row.original.status as any) },
-    { id: 'screenshot', header: 'Screenshot', cell: (info: any) => <Button variant="outline" size="sm" onClick={() => window.open(info.row.original.screenshotUrl, '_blank')} disabled={!info.row.original.screenshotUrl || info.row.original.screenshotUrl === 'disabled_for_now'}>View</Button> },
     { id: 'actions', header: 'Actions', cell: (info: any) => {
         const d = info.row.original;
         return d.status === 'pending' && (
@@ -293,27 +358,38 @@ export default function AdminPage() {
     { id: 'submissions', header: 'Submissions', cell: (info: any) => {
         const m = info.row.original as Match;
         const submissions = m.resultSubmissions ? Object.values(m.resultSubmissions) : [];
-        if (submissions.length === 0) {
-            return <span className="text-muted-foreground">N/A</span>;
+        if (m.status === 'completed' || m.status === 'open') {
+             return <span className="text-muted-foreground">N/A</span>;
         }
         return (
             <Dialog>
                 <DialogTrigger asChild>
-                    <Button variant="outline" size="sm">View Results ({submissions.length})</Button>
+                    <Button variant="outline" size="sm">
+                        View Results {submissions.length > 0 && `(${submissions.length})`}
+                    </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-4xl">
                     <DialogHeader>
-                        <DialogTitle>Match Results: {m.title}</DialogTitle>
-                        <DialogDescription>Review player submissions to resolve this match.</DialogDescription>
+                        <DialogTitle>Resolve Match: {m.title}</DialogTitle>
+                        <DialogDescription>Review player submissions and declare a winner. The prize pool will be automatically distributed with a 10% commission.</DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-6 py-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
                         {m.players.map(player => {
                             const submission = m.resultSubmissions?.[player.uid];
-                            const opponent = m.players.find(p => p.uid !== player.uid);
                             return (
                                 <Card key={player.uid}>
-                                    <CardHeader>
-                                        <CardTitle>{player.username}'s Submission</CardTitle>
+                                    <CardHeader className="flex-row items-center justify-between">
+                                        <CardTitle>{player.username}</CardTitle>
+                                        {m.status === 'inprogress' && (
+                                            <Button 
+                                                size="sm" 
+                                                onClick={() => handleDeclareWinner(m.matchId, player, m.players, m.entryFee)} 
+                                                disabled={isSubmitting[`${m.matchId}-${player.uid}`]}
+                                            >
+                                                 {isSubmitting[`${m.matchId}-${player.uid}`] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                Declare Winner
+                                            </Button>
+                                        )}
                                     </CardHeader>
                                     <CardContent>
                                         {submission ? (
@@ -332,13 +408,19 @@ export default function AdminPage() {
                                                 )}
                                             </div>
                                         ) : (
-                                            <p className="text-muted-foreground">No submission from this player.</p>
+                                            <div className="flex flex-col items-center justify-center text-center h-24 text-muted-foreground">
+                                                <UserX className="h-8 w-8 mb-2" />
+                                                <p>No submission from this player.</p>
+                                            </div>
                                         )}
                                     </CardContent>
                                 </Card>
                             )
                         })}
                     </div>
+                    <DialogFooter>
+                        <p className="text-sm text-muted-foreground">Match Status: <Badge variant="secondary">{m.status}</Badge></p>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         )
@@ -357,17 +439,16 @@ export default function AdminPage() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Admin Responsibility</AlertTitle>
           <AlertDescription>
-            You are responsible for all manual transactions. Verify payments before approving deposits and send payments before approving withdrawals.
+            You are responsible for all manual transactions. Verify payments before approving deposits and send payments before approving withdrawals. Declaring a match winner is final and will automatically transfer funds.
           </AlertDescription>
         </Alert>
 
         <Tabs defaultValue="deposits">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-6">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
             <TabsTrigger value="deposits">Deposits</TabsTrigger>
             <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
             <TabsTrigger value="players">Players</TabsTrigger>
             <TabsTrigger value="matches">Matches</TabsTrigger>
-            <TabsTrigger value="disputes">Disputes</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
