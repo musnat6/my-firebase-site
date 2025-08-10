@@ -1,4 +1,8 @@
+
 import type { User, Match, LeaderboardEntry } from '@/types';
+
+// This file is now primarily for type definitions and can be used for mock data during development if needed.
+// Most data is now fetched live from Firestore.
 
 export const mockUser: User = {
   uid: 'user-123',
@@ -60,3 +64,5 @@ export const mockLeaderboard: LeaderboardEntry[] = [
   { userId: 'rookie-4', username: 'Ares', profilePic: 'https://placehold.co/40x40', earnings: 15000, wins: 30, losses: 10 },
   { userId: 'veteran-5', username: 'Hades', profilePic: 'https://placehold.co/40x40', earnings: 12500, wins: 25, losses: 5 },
 ];
+
+    

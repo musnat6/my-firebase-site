@@ -10,7 +10,6 @@ import {
   Home,
   Landmark,
   PlusCircle,
-  ShieldQuestion,
   Swords,
   Trophy,
   Users,
@@ -20,8 +19,19 @@ import {
   DollarSign,
   ShieldCheck,
   Loader2,
+  BarChart,
 } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarTrigger,
+} from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -38,56 +48,35 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarFooter,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarTrigger,
-} from '@/components/ui/sidebar';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { mockLeaderboard } from '@/lib/data';
 import { MatchCard } from '@/components/match-card';
 import { UserNav } from '@/components/user-nav';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { addDoc, collection, onSnapshot } from 'firebase/firestore';
+import { addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Match } from '@/types';
+import { LeaderboardTable } from '@/components/leaderboard-table';
+import { useUserMatches } from '@/hooks/use-user-matches';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const { matches, loading: matchesLoading } = useUserMatches();
   const [openDialog, setOpenDialog] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [matches, setMatches] = useState<Match[]>([]);
+  const [activeTab, setActiveTab] = useState('home');
 
   // Form states
   const [depositAmount, setDepositAmount] = useState('');
   const [depositTxId, setDepositTxId] = useState('');
-  // const [depositScreenshot, setDepositScreenshot] = useState<File | null>(null);
-
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawBkash, setWithdrawBkash] = useState('');
-  
   const [matchTitle, setMatchTitle] = useState('');
   const [entryFee, setEntryFee] = useState('');
-
   const [withdrawError, setWithdrawError] = useState('');
 
   useEffect(() => {
@@ -95,33 +84,21 @@ export default function DashboardPage() {
       router.push('/login');
     }
   }, [user, loading, router]);
-  
-  useEffect(() => {
-    if (user) {
-      const matchesUnsub = onSnapshot(collection(db, 'matches'), (snapshot) => {
-        setMatches(snapshot.docs.map(doc => ({ matchId: doc.id, ...doc.data() } as Match)));
-      });
 
-      return () => matchesUnsub();
-    }
-  }, [user]);
-  
-    useEffect(() => {
+  useEffect(() => {
     if (user && withdrawAmount) {
       const amount = Number(withdrawAmount);
       if (amount > user.balance) {
         setWithdrawError(`You cannot withdraw more than your balance of ${user.balance}৳.`);
       } else if (amount <= 0) {
         setWithdrawError('Withdrawal amount must be positive.');
-      }
-      else {
+      } else {
         setWithdrawError('');
       }
     } else {
-        setWithdrawError('');
+      setWithdrawError('');
     }
   }, [withdrawAmount, user]);
-
 
   if (loading || !user) {
     return (
@@ -158,84 +135,78 @@ export default function DashboardPage() {
   const handleQuickAction = (action: string) => {
     setOpenDialog(action);
   };
-  
+
   const closeDialog = () => {
     setOpenDialog(null);
-    // Reset form fields
     setDepositAmount('');
     setDepositTxId('');
-    // setDepositScreenshot(null);
     setWithdrawAmount('');
     setWithdrawBkash('');
     setWithdrawError('');
     setMatchTitle('');
     setEntryFee('');
-  }
-  
+  };
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || withdrawError) return;
+    if (!user || (openDialog === 'withdraw' && withdrawError)) return;
     setIsSubmitting(true);
 
     try {
-        if (openDialog === 'deposit') {
-            await addDoc(collection(db, 'deposits'), {
-                userId: user.uid,
-                amount: Number(depositAmount),
-                txId: depositTxId,
-                screenshotUrl: "disabled_for_now", // Temporarily disabled
-                status: 'pending',
-                timestamp: Date.now(),
-            });
-             await addDoc(collection(db, 'withdrawals'), {
-                userId: user.uid,
-                amount: Number(withdrawAmount),
-                bkashNumber: withdrawBkash,
-                status: 'pending',
-                timestamp: Date.now(),
-            });
-        } else if (openDialog === 'withdraw') {
-             // Redundant check, but good for safety
-            if (Number(withdrawAmount) > user.balance) {
-                 toast({ title: "Error", description: "Insufficient balance.", variant: "destructive"});
-                 setIsSubmitting(false);
-                 return;
-            }
-             await addDoc(collection(db, 'withdrawals'), {
-                userId: user.uid,
-                amount: Number(withdrawAmount),
-                bkashNumber: withdrawBkash,
-                status: 'pending',
-                timestamp: Date.now(),
-            });
-        } else if (openDialog === 'createMatch') {
-             await addDoc(collection(db, 'matches'), {
-                title: matchTitle,
-                entryFee: Number(entryFee),
-                type: '1v1', // For now, default to 1v1
-                status: 'open',
-                players: [user.uid], // Creator is the first player
-                createdAt: Date.now(),
-            });
+      if (openDialog === 'deposit') {
+        await addDoc(collection(db, 'deposits'), {
+          userId: user.uid,
+          amount: Number(depositAmount),
+          txId: depositTxId,
+          screenshotUrl: 'disabled_for_now',
+          status: 'pending',
+          timestamp: Date.now(),
+        });
+      } else if (openDialog === 'withdraw') {
+        if (Number(withdrawAmount) > user.balance) {
+          toast({ title: 'Error', description: 'Insufficient balance.', variant: 'destructive' });
+          setIsSubmitting(false);
+          return;
         }
-        
-        toast({
-          title: "Success!",
-          description: "Your request has been submitted successfully."
+        await addDoc(collection(db, 'withdrawals'), {
+          userId: user.uid,
+          amount: Number(withdrawAmount),
+          bkashNumber: withdrawBkash,
+          status: 'pending',
+          timestamp: Date.now(),
         });
-        closeDialog();
+      } else if (openDialog === 'createMatch') {
+        await addDoc(collection(db, 'matches'), {
+          title: matchTitle,
+          entryFee: Number(entryFee),
+          type: '1v1',
+          status: 'open',
+          players: [user.uid],
+          createdAt: Date.now(),
+        });
+      }
 
+      toast({
+        title: 'Success!',
+        description: 'Your request has been submitted successfully.',
+      });
+      closeDialog();
     } catch (error) {
-        console.error("Submission failed:", error);
-         toast({
-          title: "Submission Failed",
-          description: (error as Error).message,
-          variant: 'destructive',
-        });
+      console.error('Submission failed:', error);
+      toast({
+        title: 'Submission Failed',
+        description: (error as Error).message,
+        variant: 'destructive',
+      });
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
-  }
+  };
+
+  const navigate = (path: string) => {
+    setActiveTab(path);
+    router.push(`/${path}`);
+  };
 
   return (
     <SidebarProvider>
@@ -243,42 +214,42 @@ export default function DashboardPage() {
         <Sidebar>
           <SidebarHeader>
             <div className="flex items-center gap-3">
-              <Image src="/logo.svg" alt="Arena Clash" width={32} height={32} data-ai-hint="logo"/>
+              <Image src="/logo.svg" alt="Arena Clash" width={32} height={32} data-ai-hint="logo" />
               <h1 className="text-xl font-headline font-bold">Arena Clash</h1>
             </div>
           </SidebarHeader>
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton isActive>
+                <SidebarMenuButton isActive={activeTab === 'home'} onClick={() => router.push('/')}>
                   <Home />
                   <span>Home</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton>
+                <SidebarMenuButton isActive={activeTab === 'matches'} onClick={() => navigate('matches')}>
                   <Swords />
                   <span>Matches</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <Trophy />
+                <SidebarMenuButton isActive={activeTab === 'leaderboard'} onClick={() => navigate('leaderboard')}>
+                  <BarChart />
                   <span>Leaderboard</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton>
+                <SidebarMenuButton isActive={activeTab === 'wallet'} onClick={() => navigate('wallet')}>
                   <Wallet />
                   <span>Wallet</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               {user.role === 'admin' && (
-                 <SidebarMenuItem>
-                    <SidebarMenuButton onClick={() => router.push('/admin')}>
-                        <ShieldCheck />
-                        <span>Admin Panel</span>
-                    </SidebarMenuButton>
+                <SidebarMenuItem>
+                  <SidebarMenuButton onClick={() => router.push('/admin')}>
+                    <ShieldCheck />
+                    <span>Admin Panel</span>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
             </SidebarMenu>
@@ -287,9 +258,7 @@ export default function DashboardPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Need Help?</CardTitle>
-                <CardDescription>
-                  Contact support for any issues.
-                </CardDescription>
+                <CardDescription>Contact support for any issues.</CardDescription>
               </CardHeader>
               <CardContent>
                 <Button size="sm" className="w-full">
@@ -326,9 +295,7 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{user.balance}৳</div>
-                  <p className="text-xs text-muted-foreground">
-                    Available to play
-                  </p>
+                  <p className="text-xs text-muted-foreground">Available to play</p>
                 </CardContent>
               </Card>
               <Card>
@@ -338,9 +305,7 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{user.stats.wins}</div>
-                  <p className="text-xs text-muted-foreground">
-                    Total matches won
-                  </p>
+                  <p className="text-xs text-muted-foreground">Total matches won</p>
                 </CardContent>
               </Card>
               <Card>
@@ -350,23 +315,17 @@ export default function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{user.stats.losses}</div>
-                  <p className="text-xs text-muted-foreground">
-                    Total matches lost
-                  </p>
+                  <p className="text-xs text-muted-foreground">Total matches lost</p>
                 </CardContent>
               </Card>
               <Card className="bg-primary text-primary-foreground">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Total Earnings
-                  </CardTitle>
+                  <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
                   <Trophy className="h-4 w-4 text-primary-foreground/80" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{user.stats.earnings}৳</div>
-                  <p className="text-xs text-primary-foreground/80">
-                    Lifetime winnings
-                  </p>
+                  <p className="text-xs text-primary-foreground/80">Lifetime winnings</p>
                 </CardContent>
               </Card>
             </section>
@@ -375,11 +334,9 @@ export default function DashboardPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Quick Actions</CardTitle>
-                  <CardDescription>
-                    Get into the game or manage your funds.
-                  </CardDescription>
+                  <CardDescription>Get into the game or manage your funds.</CardDescription>
                 </CardHeader>
-                <CardContent className="flex flex-wrap gap-4">
+                <CardContent className="flex flex-col sm:flex-row flex-wrap gap-4">
                   <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground" onClick={() => handleQuickAction('createMatch')}>
                     <PlusCircle className="mr-2 h-5 w-5" /> Create New Match
                   </Button>
@@ -402,61 +359,29 @@ export default function DashboardPage() {
                 <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
               </TabsList>
               <TabsContent value="matches">
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {matches.map((match) => (
-                    <MatchCard key={match.matchId} match={match} />
-                  ))}
-                </div>
+                {matchesLoading ? (
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                     {[...Array(4)].map((_, i) => (
+                        <Card key={i} className="h-[380px]">
+                            <CardContent className="p-6 h-full flex items-center justify-center">
+                                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                            </CardContent>
+                        </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {matches.map((match) => (
+                      <MatchCard key={match.matchId} match={match} />
+                    ))}
+                  </div>
+                )}
               </TabsContent>
               <TabsContent value="leaderboard">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Top Players</CardTitle>
-                    <CardDescription>
-                      See who is dominating the arena.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[80px] text-center">Rank</TableHead>
-                          <TableHead>Player</TableHead>
-                          <TableHead className="text-right">Earnings</TableHead>
-                          <TableHead className="hidden text-right md:table-cell">Wins</TableHead>
-                          <TableHead className="hidden text-right md:table-cell">Losses</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {mockLeaderboard.map((player, index) => (
-                          <TableRow key={player.userId}>
-                            <TableCell className="font-bold text-lg">
-                              <div className="flex items-center justify-center h-10 w-10 rounded-full bg-muted mx-auto">
-                                {index + 1}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-10 w-10">
-                                  <AvatarImage src={player.profilePic} alt={player.username} data-ai-hint="avatar" />
-                                  <AvatarFallback>{player.username.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <span className="font-medium truncate">{player.username}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right font-bold text-primary">{player.earnings}৳</TableCell>
-                            <TableCell className="hidden text-right text-green-600 md:table-cell">{player.wins}</TableCell>
-                            <TableCell className="hidden text-right text-red-600 md:table-cell">{player.losses}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
+                <LeaderboardTable />
               </TabsContent>
             </Tabs>
             
-            {/* Dialog for Quick Actions */}
             <Dialog open={openDialog !== null} onOpenChange={(isOpen) => !isOpen && closeDialog()}>
               <DialogContent className="sm:max-w-md">
                 <DialogHeader>
@@ -483,8 +408,6 @@ export default function DashboardPage() {
                                 1. Send your payment to the bKash number: <strong className="font-code">01860151497</strong>
                                 <br/>
                                 2. Enter the amount and the Transaction ID (TrxID) below.
-                                <br />
-                                3. Upload a screenshot of the confirmation message.
                             </AlertDescription>
                         </Alert>
                         <div className="grid gap-2">
@@ -494,10 +417,6 @@ export default function DashboardPage() {
                         <div className="grid gap-2">
                             <Label htmlFor="trxId">bKash Transaction ID (TrxID)</Label>
                             <Input id="trxId" placeholder="e.g., 9C7B8A1D2E" required value={depositTxId} onChange={(e) => setDepositTxId(e.target.value)} />
-                        </div>
-                         <div className="grid gap-2">
-                            <Label htmlFor="screenshot">Screenshot (Temporarily Disabled)</Label>
-                            <Input id="screenshot" type="file" disabled />
                         </div>
                         </>
                     )}
@@ -511,10 +430,6 @@ export default function DashboardPage() {
                         <div className="grid gap-2">
                             <Label htmlFor="bkash-number">Your bKash Number</Label>
                             <Input id="bkash-number" placeholder="e.g., 01xxxxxxxxx" required value={withdrawBkash} onChange={(e) => setWithdrawBkash(e.target.value)} />
-                        </div>
-                         <div className="grid gap-2">
-                            <Label htmlFor="notes">Notes (Optional)</Label>
-                            <Input id="notes" placeholder="Any extra details for the admin" />
                         </div>
                         </>
                     )}
@@ -535,10 +450,6 @@ export default function DashboardPage() {
                         {opponentSuggestions.map((opp) => (
                             <Card key={opp.userId}>
                             <CardContent className="flex items-center gap-4 p-4">
-                                <Avatar className="h-16 w-16">
-                                <AvatarImage src={opp.profilePic} alt={opp.username} data-ai-hint="avatar" />
-                                <AvatarFallback>{opp.username.charAt(0)}</AvatarFallback>
-                                </Avatar>
                                 <div className="flex-grow">
                                 <h3 className="font-bold text-lg">{opp.username}</h3>
                                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -575,3 +486,5 @@ export default function DashboardPage() {
     </SidebarProvider>
   );
 }
+
+    

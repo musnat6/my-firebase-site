@@ -1,3 +1,4 @@
+
 "use client"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -14,9 +15,11 @@ import {
 import { CreditCard, LogOut, Settings, User as UserIcon } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 export function UserNav() {
   const { user, signOut } = useAuth();
+  const router = useRouter();
 
   if (!user) {
     return (
@@ -24,6 +27,11 @@ export function UserNav() {
         <Button variant="outline">Login</Button>
       </Link>
     )
+  }
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push('/login');
   }
 
   return (
@@ -47,21 +55,21 @@ export function UserNav() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push('/profile')}>
             <UserIcon className="mr-2 h-4 w-4" />
             <span>Profile</span>
           </DropdownMenuItem>
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push('/billing')}>
             <CreditCard className="mr-2 h-4 w-4" />
             <span>Billing</span>
           </DropdownMenuItem>
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push('/settings')}>
             <Settings className="mr-2 h-4 w-4" />
             <span>Settings</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={signOut}>
+        <DropdownMenuItem onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>
@@ -69,3 +77,5 @@ export function UserNav() {
     </DropdownMenu>
   )
 }
+
+    

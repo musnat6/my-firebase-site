@@ -1,15 +1,26 @@
+
+'use client';
+
 import type { Match } from "@/types"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Users, Swords, Award } from "lucide-react"
-import Image from "next/image"
+import { Users, Swords, Gamepad2, Trophy, Loader2 } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
+import { doc, updateDoc, arrayUnion } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { useToast } from "@/hooks/use-toast"
+import { useState } from "react"
 
 interface MatchCardProps {
   match: Match
 }
 
 export function MatchCard({ match }: MatchCardProps) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [isJoining, setIsJoining] = useState(false);
+
   const getStatusBadgeVariant = (status: Match['status']) => {
     switch (status) {
       case 'open':
@@ -23,10 +34,49 @@ export function MatchCard({ match }: MatchCardProps) {
     }
   }
 
+  const handleJoinMatch = async () => {
+    if (!user) {
+      toast({ title: "Error", description: "You must be logged in to join.", variant: "destructive" });
+      return;
+    }
+    if (user.balance < match.entryFee) {
+        toast({ title: "Insufficient Funds", description: `You need ${match.entryFee}৳ to join this match.`, variant: "destructive" });
+        return;
+    }
+
+    setIsJoining(true);
+    const matchRef = doc(db, 'matches', match.matchId);
+    try {
+        await updateDoc(matchRef, {
+            players: arrayUnion(user.uid)
+        });
+        toast({ title: "Successfully Joined!", description: "Good luck in your match." });
+    } catch (error) {
+        console.error("Error joining match:", error);
+        toast({ title: "Error", description: "Could not join the match. Please try again.", variant: "destructive" });
+    } finally {
+        setIsJoining(false);
+    }
+  }
+
+  const userIsInMatch = user && match.players.includes(user.uid);
+  const isFull = match.players.length >= (match.type === '1v1' ? 2 : 8);
+
+  const getIcon = () => {
+    switch (match.type) {
+        case '1v1':
+            return <Swords className="h-12 w-12 text-primary/80" />;
+        case 'Mini Tournament':
+            return <Trophy className="h-12 w-12 text-primary/80" />;
+        default:
+            return <Gamepad2 className="h-12 w-12 text-primary/80" />;
+    }
+  }
+
   return (
     <Card className="flex flex-col h-full hover:shadow-accent/20 hover:shadow-lg transition-shadow duration-300 overflow-hidden">
-        <div className="aspect-video bg-muted relative">
-            <Image src="https://placehold.co/600x400" alt={match.title} fill className="object-cover" data-ai-hint="esports stadium" />
+        <div className="aspect-video bg-muted/50 flex items-center justify-center">
+            {getIcon()}
         </div>
       <CardHeader>
         <div className="flex justify-between items-start">
@@ -45,10 +95,18 @@ export function MatchCard({ match }: MatchCardProps) {
             <p className="text-sm text-muted-foreground">Entry Fee</p>
             <p className="text-2xl font-bold font-headline text-primary">{match.entryFee}৳</p>
         </div>
-        <Button className="w-full mt-2" disabled={match.status !== 'open'} variant="default">
-          Join Match
+        <Button 
+          className="w-full mt-2" 
+          disabled={match.status !== 'open' || userIsInMatch || isFull || isJoining} 
+          variant="default"
+          onClick={handleJoinMatch}
+        >
+          {isJoining && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {userIsInMatch ? 'Joined' : isFull ? 'Match Full' : 'Join Match'}
         </Button>
       </CardFooter>
     </Card>
   )
 }
+
+    
