@@ -241,12 +241,6 @@ export default function DashboardPage() {
                   <span>Wallet</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <ShieldQuestion />
-                  <span>Disputes</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
               {user.role === 'admin' && (
                  <SidebarMenuItem>
                     <SidebarMenuButton onClick={() => router.push('/admin')}>
