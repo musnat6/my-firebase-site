@@ -65,7 +65,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { addDoc, collection, serverTimestamp, getFirestore } from 'firebase/firestore';
+import { addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -160,7 +160,7 @@ export default function DashboardPage() {
                 txId: depositTxId,
                 screenshotUrl: screenshotUrl,
                 status: 'pending',
-                timestamp: serverTimestamp(),
+                timestamp: Date.now(),
             });
         } else if (openDialog === 'withdraw') {
              await addDoc(collection(db, 'withdrawals'), {
@@ -168,7 +168,7 @@ export default function DashboardPage() {
                 amount: Number(withdrawAmount),
                 bkashNumber: withdrawBkash,
                 status: 'pending',
-                timestamp: serverTimestamp(),
+                timestamp: Date.now(),
             });
         }
         
