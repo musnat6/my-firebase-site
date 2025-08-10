@@ -3,10 +3,10 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db } from '@/lib/firebase';
-import type { Match, User } from '@/types';
+import type { Match, User, ResultSubmission } from '@/types';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +18,153 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { verifyMatchResult, VerifyMatchResultOutput } from '@/ai/flows/verify-match-result';
 
+function ResultSubmissionCard({ 
+    match, 
+    player, 
+    opponent,
+    user,
+}: { 
+    match: Match, 
+    player: NonNullable<Match['players'][0]>, 
+    opponent: NonNullable<Match['players'][0]>,
+    user: User 
+}) {
+    const { toast } = useToast();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [aiResult, setAiResult] = useState<VerifyMatchResultOutput | null>(null);
+
+    const playerSubmission = match.resultSubmissions?.[player.uid];
+
+    const fileToDataUri = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const handleSubmitResult = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!selectedFile || !user || !match) return;
+
+        setIsSubmitting(true);
+        setIsVerifying(true);
+
+        try {
+            const photoDataUri = await fileToDataUri(selectedFile);
+            const storage = getStorage();
+            const screenshotRef = ref(storage, `match-results/${match.matchId}/${player.uid}_${Date.now()}`);
+            
+            await uploadString(screenshotRef, photoDataUri, 'data_url');
+            const screenshotUrl = await getDownloadURL(screenshotRef);
+
+            const aiAnalysis = await verifyMatchResult({
+                player1: { uid: user.uid, username: user.username },
+                player2: { uid: opponent.uid, username: opponent.username },
+                screenshotDataUri: photoDataUri,
+            });
+            setAiResult(aiAnalysis);
+            setIsVerifying(false);
+
+            const newSubmission: ResultSubmission = {
+                submittedBy: player.uid,
+                screenshotUrl,
+                submittedAt: Date.now(),
+                aiAnalysis,
+                confirmedByOpponent: false
+            };
+            
+            const matchRef = doc(db, 'matches', match.matchId);
+            await updateDoc(matchRef, {
+                [`resultSubmissions.${player.uid}`]: newSubmission
+            });
+
+            toast({ title: 'Result Submitted', description: 'Your result has been submitted for review.', className: 'bg-green-600 text-white' });
+
+        } catch (error) {
+            console.error('Error submitting result:', error);
+            toast({
+                title: 'Submission Failed',
+                description: (error as Error).message,
+                variant: 'destructive',
+            });
+            setIsVerifying(false);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    
+    if (playerSubmission) {
+        return (
+            <Card className="bg-muted/50">
+                <CardHeader>
+                    <CardTitle className="text-lg">{player.username}'s Submission</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <p className="text-sm">Submitted at: {new Date(playerSubmission.submittedAt).toLocaleString()}</p>
+                    <a href={playerSubmission.screenshotUrl} target="_blank" rel="noopener noreferrer">
+                        <Button variant="secondary">View Screenshot</Button>
+                    </a>
+                     {playerSubmission.aiAnalysis && (
+                         <Alert className="bg-primary/5 border-primary/20">
+                            <Trophy className="h-4 w-4 text-primary" />
+                            <AlertTitle className="text-primary">AI Detected Winner: {playerSubmission.aiAnalysis.winner.username}</AlertTitle>
+                            <AlertDescription className="mt-2 space-y-2">
+                                <p><strong className="font-semibold">Reasoning:</strong> {playerSubmission.aiAnalysis.reasoning}</p>
+                            </AlertDescription>
+                        </Alert>
+                     )}
+                </CardContent>
+            </Card>
+        )
+    }
+
+    if (player.uid !== user.uid) {
+         return (
+            <Card className="bg-muted/50">
+                <CardHeader>
+                    <CardTitle className="text-lg">{player.username}'s Submission</CardTitle>
+                </CardHeader>
+                <CardContent className="flex items-center justify-center h-24">
+                   <p className="text-muted-foreground">Waiting for submission...</p>
+                </CardContent>
+            </Card>
+        )
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Submit Your Result</CardTitle>
+                <CardDescription>Upload a screenshot of the final score screen to verify the winner.</CardDescription>
+            </CardHeader>
+            <form onSubmit={handleSubmitResult}>
+                <CardContent className="space-y-4">
+                    <Alert>
+                        <Upload className="h-4 w-4" />
+                        <AlertTitle>Screenshot Requirement</AlertTitle>
+                        <AlertDescription>
+                            Please upload a clear, uncropped screenshot of the final match result screen showing both players' names and the final score.
+                        </AlertDescription>
+                    </Alert>
+                    <div className="grid w-full items-center gap-1.5">
+                        <Label htmlFor="screenshot">Screenshot File</Label>
+                        <Input id="screenshot" type="file" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} required accept="image/*" />
+                    </div>
+                    <Button type="submit" disabled={isSubmitting || !selectedFile}>
+                        {(isSubmitting || isVerifying) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isVerifying ? 'AI is Verifying...' : isSubmitting ? 'Submitting...' : 'Submit Result'}
+                    </Button>
+                </CardContent>
+            </form>
+        </Card>
+    );
+}
+
+
 export default function MatchDetailPage() {
   const { matchId } = useParams();
   const { user, loading: authLoading } = useAuth();
@@ -26,11 +173,7 @@ export default function MatchDetailPage() {
 
   const [match, setMatch] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [aiResult, setAiResult] = useState<VerifyMatchResultOutput | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
-
+  
   useEffect(() => {
     if (typeof matchId !== 'string') return;
 
@@ -48,61 +191,6 @@ export default function MatchDetailPage() {
     return () => unsubscribe();
   }, [matchId, router, toast]);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      setSelectedFile(event.target.files[0]);
-    }
-  };
-
-  const fileToDataUri = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleSubmitResult = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!selectedFile || !user || !match) return;
-
-    setIsSubmitting(true);
-    setAiResult(null);
-
-    try {
-      const photoDataUri = await fileToDataUri(selectedFile);
-      
-      const opponent = match.players.find(p => p.uid !== user.uid);
-      if (!opponent) throw new Error("Opponent not found");
-
-      setIsVerifying(true);
-      const result = await verifyMatchResult({
-        player1: { uid: user.uid, username: user.username },
-        player2: { uid: opponent.uid, username: opponent.username },
-        screenshotDataUri: photoDataUri,
-      });
-      setAiResult(result);
-      setIsVerifying(false);
-
-      toast({ title: 'AI Verification Complete', description: 'The AI has analyzed the result.', className: 'bg-green-600 text-white' });
-
-      // In a real scenario, you might auto-approve based on AI confidence
-      // or flag for admin review. For now, we just display the result.
-      // You could add a button to "Confirm & Finalize" which then updates the DB.
-
-    } catch (error) {
-      console.error('Error submitting result:', error);
-      toast({
-        title: 'Submission Failed',
-        description: (error as Error).message,
-        variant: 'destructive',
-      });
-      setIsVerifying(false);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   if (loading || authLoading) {
     return (
@@ -112,12 +200,13 @@ export default function MatchDetailPage() {
     );
   }
 
-  if (!match) {
+  if (!match || !user) {
     return null; // Or a not found component
   }
   
-  const userIsInMatch = user && match.players.some(p => p.uid === user.uid);
+  const userIsInMatch = match.players.some(p => p.uid === user.uid);
   const isMatchInProgress = match.status === 'inprogress';
+  const [player1, player2] = match.players;
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
@@ -168,52 +257,12 @@ export default function MatchDetailPage() {
             </Card>
 
             {userIsInMatch && isMatchInProgress && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Submit Match Result</CardTitle>
-                        <CardDescription>Upload a screenshot of the final score screen to verify the winner.</CardDescription>
-                    </CardHeader>
-                    <form onSubmit={handleSubmitResult}>
-                        <CardContent className="space-y-4">
-                             <Alert>
-                                <Upload className="h-4 w-4" />
-                                <AlertTitle>Screenshot Requirement</AlertTitle>
-                                <AlertDescription>
-                                    Please upload a clear, uncropped screenshot of the final match result screen showing both players' names and the final score.
-                                </AlertDescription>
-                            </Alert>
-                            <div className="grid w-full max-w-sm items-center gap-1.5">
-                                <Label htmlFor="screenshot">Screenshot File</Label>
-                                <Input id="screenshot" type="file" onChange={handleFileChange} required accept="image/*" />
-                            </div>
-                             <Button type="submit" disabled={isSubmitting || !selectedFile}>
-                                {(isSubmitting) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {isVerifying ? 'AI is Verifying...' : isSubmitting ? 'Submitting...' : 'Submit for Verification'}
-                            </Button>
-                        </CardContent>
-                    </form>
-                </Card>
-            )}
-
-             {aiResult && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>AI Verification Result</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <Alert className="bg-primary/5 border-primary/20">
-                            <Trophy className="h-4 w-4 text-primary" />
-                            <AlertTitle className="text-primary">Winner Detected: {aiResult.winner.username}</AlertTitle>
-                            <AlertDescription className="mt-2 space-y-2">
-                                <p><strong className="font-semibold">AI's Reasoning:</strong> {aiResult.reasoning}</p>
-                            </AlertDescription>
-                        </Alert>
-                        <div className="flex gap-4">
-                            <Button>Confirm and Finalize Result</Button>
-                            <Button variant="destructive">Dispute Result</Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                <div className="grid md:grid-cols-2 gap-6">
+                    <ResultSubmissionCard match={match} player={player1} opponent={player2} user={user} />
+                    {player2 ? (
+                        <ResultSubmissionCard match={match} player={player2} opponent={player1} user={user} />
+                    ) : null}
+                </div>
             )}
         </main>
     </div>

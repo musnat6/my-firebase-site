@@ -20,6 +20,18 @@ export interface User {
   };
 }
 
+export interface ResultSubmission {
+  submittedBy: string; // uid of the player who submitted
+  screenshotUrl: string;
+  submittedAt: number;
+  aiAnalysis?: {
+    winnerUid: string;
+    reasoning: string;
+    confidence: number;
+  },
+  confirmedByOpponent: boolean;
+}
+
 export interface Match {
   matchId: string;
   title: string;
@@ -27,24 +39,16 @@ export interface Match {
   type: '1v1' | 'Mini Tournament';
   entryFee: number;
   players: PlayerRef[]; // array of player objects
-  status: 'open' | 'inprogress' | 'pending_confirmation' | 'completed' | 'disputed';
+  status: 'open' | 'inprogress' | 'completed' | 'disputed';
   winner?: PlayerRef;
-  resultProof?: {
-    submittedBy: string;
-    screenshotUrl: string;
-    submittedAt: number;
-    aiAnalysis?: {
-      winnerUid: string;
-      reasoning: string;
-      confidence: number;
-    }
-  },
+  resultSubmissions?: { [uid: string]: ResultSubmission }; // Submissions from each player, keyed by UID
   dispute?: {
     reportedBy: string;
     reason: string;
   };
   createdAt: number; // timestamp
 }
+
 
 export interface LeaderboardEntry {
   userId: string;
@@ -77,4 +81,8 @@ export interface Withdrawal {
   status: 'pending' | 'approved' | 'declined';
   timestamp: number;
   handledBy?: string;
+}
+
+export interface PaymentSettings {
+  number: string;
 }

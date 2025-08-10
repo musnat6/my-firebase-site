@@ -22,14 +22,81 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, CheckCircle, Clock, Loader2 } from 'lucide-react';
-import { collection, onSnapshot, doc, updateDoc, runTransaction, query, orderBy, getDocs } from 'firebase/firestore';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertTriangle, CheckCircle, Clock, Loader2, Save } from 'lucide-react';
+import { collection, onSnapshot, doc, updateDoc, runTransaction, query, orderBy, getDocs, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Deposit, Withdrawal, User, Match } from '@/types';
+import type { Deposit, Withdrawal, User, Match, PaymentSettings } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { DisputeSummarizer } from '@/components/dispute-summarizer';
 import { AdminDataTable } from '@/components/admin-data-table';
 import { useAllUsers } from '@/hooks/use-all-users';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
+function SettingsTab() {
+  const [settings, setSettings] = useState<PaymentSettings>({ number: '' });
+  const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const settingsRef = doc(db, 'settings', 'payment');
+    const unsubscribe = onSnapshot(settingsRef, (doc) => {
+      if (doc.exists()) {
+        setSettings(doc.data() as PaymentSettings);
+      }
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    const settingsRef = doc(db, 'settings', 'payment');
+    try {
+      await setDoc(settingsRef, settings, { merge: true });
+      toast({ title: 'Settings Saved', description: 'Payment number has been updated.', className: 'bg-green-600 text-white' });
+    } catch (error) {
+      console.error("Error saving settings: ", error);
+      toast({ title: 'Error', description: 'Failed to save settings.', variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  if(loading) {
+     return (
+        <div className="flex h-48 items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Payment Settings</CardTitle>
+        <CardDescription>Update the number where users send their deposits.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+            <Label htmlFor="bKashNumber">bKash Deposit Number</Label>
+            <Input 
+                id="bKashNumber"
+                value={settings.number}
+                onChange={(e) => setSettings({ ...settings, number: e.target.value })}
+            />
+        </div>
+        <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Save className="mr-2 h-4 w-4" />
+            Save Settings
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function AdminPage() {
   const { user, loading } = useAuth();
@@ -134,6 +201,7 @@ export default function AdminPage() {
             });
             toast({ title: 'Withdrawal Approved', description: 'User balance deducted. Send payment manually.', className: 'bg-green-600 text-white' });
         } else {
+            // If declined, refund the money to user's balance
             await updateDoc(withdrawalRef, { status: newStatus, handledBy: user?.uid });
             toast({ title: 'Withdrawal Declined', description: 'The withdrawal request has been declined.', variant: 'destructive' });
         }
@@ -170,7 +238,7 @@ export default function AdminPage() {
     { accessorKey: 'amount', header: 'Amount (৳)' },
     { accessorKey: 'txId', header: 'Transaction ID' },
     { id: 'status', header: 'Status', cell: (info: any) => getStatusBadge(info.row.original.status as any) },
-    { id: 'screenshot', header: 'Screenshot', cell: (info: any) => <Button variant="outline" size="sm" onClick={() => window.open(info.row.original.screenshotUrl, '_blank')} disabled={info.row.original.screenshotUrl === 'disabled_for_now'}>View</Button> },
+    { id: 'screenshot', header: 'Screenshot', cell: (info: any) => <Button variant="outline" size="sm" onClick={() => window.open(info.row.original.screenshotUrl, '_blank')} disabled={!info.row.original.screenshotUrl || info.row.original.screenshotUrl === 'disabled_for_now'}>View</Button> },
     { id: 'actions', header: 'Actions', cell: (info: any) => {
         const d = info.row.original;
         return d.status === 'pending' && (
@@ -202,9 +270,9 @@ export default function AdminPage() {
     { accessorKey: 'username', header: 'Username' },
     { accessorKey: 'email', header: 'Email' },
     { accessorKey: 'balance', header: 'Balance (৳)' },
-    { accessorKey: 'stats.wins', header: 'Wins' },
-    { accessorKey: 'stats.losses', header: 'Losses' },
-    { accessorKey: 'stats.earnings', header: 'Earnings (৳)' },
+    { id: 'wins', header: 'Wins', cell: (info: any) => info.row.original.stats?.wins ?? 0 },
+    { id: 'losses', header: 'Losses', cell: (info: any) => info.row.original.stats?.losses ?? 0 },
+    { id: 'earnings', header: 'Earnings (৳)', cell: (info: any) => info.row.original.stats?.earnings ?? 0 },
     { accessorKey: 'role', header: 'Role' },
   ];
 
@@ -233,12 +301,13 @@ export default function AdminPage() {
         </Alert>
 
         <Tabs defaultValue="deposits">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-6">
             <TabsTrigger value="deposits">Deposits</TabsTrigger>
             <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
             <TabsTrigger value="players">Players</TabsTrigger>
             <TabsTrigger value="matches">Matches</TabsTrigger>
             <TabsTrigger value="disputes">Disputes</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="deposits">
@@ -292,9 +361,12 @@ export default function AdminPage() {
           <TabsContent value="disputes">
               <DisputeSummarizer />
           </TabsContent>
+
+          <TabsContent value="settings">
+              <SettingsTab />
+          </TabsContent>
         </Tabs>
       </main>
     </div>
   );
 }
-

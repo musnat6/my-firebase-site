@@ -1,4 +1,3 @@
-
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -20,6 +19,8 @@ import {
   Loader2,
   BarChart,
   Trophy,
+  Copy,
+  Check,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -55,13 +56,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { addDoc, collection } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { LeaderboardTable } from '@/components/leaderboard-table';
 import { useUserMatches } from '@/hooks/use-user-matches';
 import { suggestOpponents, SuggestOpponentsOutput } from '@/ai/flows/suggest-opponents';
-import { generateMatchDescription, GenerateMatchDescriptionOutput } from '@/ai/flows/generate-match-description';
+import { generateMatchDescription } from '@/ai/flows/generate-match-description';
 import { Textarea } from '@/components/ui/textarea';
+import type { PaymentSettings } from '@/types';
 
 
 export default function DashboardPage() {
@@ -71,9 +73,10 @@ export default function DashboardPage() {
   const { matches, loading: matchesLoading } = useUserMatches();
   const [openDialog, setOpenDialog] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState('home');
   const [opponentSuggestions, setOpponentSuggestions] = useState<SuggestOpponentsOutput>([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>({ number: 'Loading...' });
+  const [hasCopied, setHasCopied] = useState(false);
 
   // Form states
   const [depositAmount, setDepositAmount] = useState('');
@@ -91,6 +94,18 @@ export default function DashboardPage() {
       router.push('/login');
     }
   }, [user, loading, router]);
+  
+  useEffect(() => {
+    const settingsRef = doc(db, 'settings', 'payment');
+    const unsubscribe = onSnapshot(settingsRef, (doc) => {
+        if (doc.exists()) {
+            setPaymentSettings(doc.data() as PaymentSettings);
+        } else {
+            setPaymentSettings({ number: 'Not Set' });
+        }
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (user && withdrawAmount) {
@@ -169,6 +184,7 @@ export default function DashboardPage() {
     setMatchDescription('');
     setEntryFee('');
     setOpponentSuggestions([]);
+    setHasCopied(false);
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -210,6 +226,7 @@ export default function DashboardPage() {
           status: 'open',
           players: [{ uid: user.uid, username: user.username, profilePic: user.profilePic }],
           createdAt: Date.now(),
+          resultSubmissions: {},
         });
       }
 
@@ -235,6 +252,12 @@ export default function DashboardPage() {
     router.push(path.startsWith('/') ? path : `/${path}`);
   };
 
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(paymentSettings.number);
+    setHasCopied(true);
+    setTimeout(() => setHasCopied(false), 2000);
+  };
+
   return (
     <SidebarProvider>
       <div className="relative min-h-screen w-full md:grid md:grid-cols-[auto_1fr]">
@@ -248,7 +271,7 @@ export default function DashboardPage() {
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton isActive={activeTab === 'home'} onClick={() => navigate('/')} tooltip="Dashboard">
+                <SidebarMenuButton isActive={true} onClick={() => navigate('/')} tooltip="Dashboard">
                   <Home />
                   <span>Home</span>
                 </SidebarMenuButton>
@@ -429,14 +452,23 @@ export default function DashboardPage() {
                     <div className="py-4 space-y-4">
                     {openDialog === 'deposit' && (
                         <>
-                         <Alert>
+                        <Alert>
                             <AlertTitle className="font-bold">Payment Instructions</AlertTitle>
                             <AlertDescription>
-                                1. Send your payment to the bKash number: <strong className="font-code">01860151497</strong>
+                                1. Send your payment to the bKash number below.
                                 <br/>
-                                2. Enter the amount and the Transaction ID (TrxID) below.
+                                2. Enter the amount and the Transaction ID (TrxID).
                             </AlertDescription>
                         </Alert>
+                        <div className="grid gap-2">
+                            <Label>bKash Number</Label>
+                            <div className="flex items-center space-x-2">
+                                <Input id="bKashNumber" value={paymentSettings.number} readOnly className="font-code" />
+                                <Button type="button" variant="outline" size="icon" onClick={copyToClipboard}>
+                                    {hasCopied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                        </div>
                         <div className="grid gap-2">
                             <Label htmlFor="amount">Amount (৳)</Label>
                             <Input id="amount" placeholder="Enter amount" type="number" required value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
