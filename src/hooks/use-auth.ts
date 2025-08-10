@@ -33,7 +33,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -46,7 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (userDoc.exists()) {
           setUser(userDoc.data() as User);
         } else {
-          // Create a new user document if it doesn't exist
+          // This case handles Google sign-in for the first time
           const newUser: User = {
             uid: firebaseUser.uid,
             email: firebaseUser.email || '',
@@ -66,32 +66,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, []);
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
-      const userDocRef = doc(db, 'users', firebaseUser.uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (!userDoc.exists()) {
-        const newUser: User = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email!,
-          username: firebaseUser.displayName!,
-          profilePic: firebaseUser.photoURL!,
-          balance: 0,
-          role: 'player',
-          stats: { wins: 0, losses: 0, earnings: 0 },
-        };
-        await setDoc(userDocRef, newUser);
-        setUser(newUser);
-      }
+      await signInWithPopup(auth, provider);
       router.push('/');
     } catch (error) {
       console.error('Error signing in with Google:', error);
+      throw error;
     }
   };
   
@@ -130,7 +114,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     try {
       await firebaseSignOut(auth);
-      setUser(null);
       router.push('/login');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -144,7 +127,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
