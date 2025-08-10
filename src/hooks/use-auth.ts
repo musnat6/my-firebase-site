@@ -4,7 +4,7 @@ import { onAuthStateChanged, User as FirebaseUser, signOut as firebaseSignOut, G
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
-import type { User } from '@/types';
+import { User } from '@/types';
 
 // Define the shape of the authentication context
 interface AuthContextType {
