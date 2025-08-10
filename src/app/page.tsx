@@ -119,7 +119,7 @@ export default function DashboardPage() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen w-full">
+      <div className="relative min-h-screen w-full md:grid md:grid-cols-[auto_1fr]">
         <Sidebar>
           <SidebarHeader>
             <div className="flex items-center gap-3">
@@ -178,7 +178,7 @@ export default function DashboardPage() {
           </SidebarFooter>
         </Sidebar>
 
-        <SidebarInset>
+        <div className="flex flex-col">
           <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="md:hidden" />
@@ -408,9 +408,11 @@ export default function DashboardPage() {
             </Dialog>
 
           </main>
-        </SidebarInset>
+        </div>
       </div>
     </SidebarProvider>
   );
 }
  
+
+    
