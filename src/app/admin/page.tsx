@@ -21,11 +21,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, CheckCircle, Clock, Loader2, Save, UserX } from 'lucide-react';
-import { collection, onSnapshot, doc, updateDoc, runTransaction, query, orderBy, setDoc } from 'firebase/firestore';
+import { AlertTriangle, CheckCircle, Clock, Loader2, Save, Trash2, UserX } from 'lucide-react';
+import { collection, onSnapshot, doc, updateDoc, runTransaction, query, orderBy, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Deposit, Withdrawal, User, Match, PlayerRef, PaymentSettings } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -284,8 +295,25 @@ export default function AdminPage() {
     } finally {
         setIsSubmitting(prev => ({ ...prev, [submittingKey]: false }));
     }
-};
+  };
 
+  const handleDeleteMatch = async (matchId: string) => {
+    setIsSubmitting(prev => ({...prev, [`delete-${matchId}`]: true}));
+    const matchRef = doc(db, 'matches', matchId);
+    try {
+      await deleteDoc(matchRef);
+      toast({
+        title: 'Match Deleted',
+        description: 'The match has been removed from the list.',
+        className: 'bg-green-600 text-white'
+      });
+    } catch (error) {
+      console.error("Error deleting match:", error);
+      toast({ title: 'Error', description: 'Could not delete the match.', variant: 'destructive' });
+    } finally {
+      setIsSubmitting(prev => ({...prev, [`delete-${matchId}`]: false}));
+    }
+  }
 
 
   if (loading || !user || user.role !== 'admin') {
@@ -355,65 +383,88 @@ export default function AdminPage() {
     { id: 'players', header: 'Players', cell: (info: any) => `${info.row.original.players.length} / ${info.row.original.type === '1v1' ? 2 : 8}` },
     { accessorKey: 'status', header: 'Status' },
     { id: 'winner', header: 'Winner', cell: (info: any) => info.row.original.winner?.username || 'N/A'},
-    { id: 'submissions', header: 'Submissions', cell: (info: any) => {
+    { id: 'actions', header: 'Actions', cell: (info: any) => {
         const m = info.row.original as Match;
         const submissions = m.resultSubmissions ? Object.values(m.resultSubmissions) : [];
-        if (m.status === 'completed' || m.status === 'open') {
-             return <span className="text-muted-foreground">N/A</span>;
-        }
         return (
-            <Dialog>
-                <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" disabled={submissions.length === 0}>
-                        View Results {submissions.length > 0 && `(${submissions.length})`}
-                    </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-4xl">
-                    <DialogHeader>
-                        <DialogTitle>Resolve Match: {m.title}</DialogTitle>
-                        <DialogDescription>Review player submissions and declare a winner. The prize pool will be automatically distributed with a 10% commission.</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                        {m.players.map(player => {
-                            const submission = m.resultSubmissions?.[player.uid];
-                            return (
-                                <Card key={player.uid}>
-                                    <CardHeader className="flex-row items-center justify-between">
-                                        <CardTitle>{player.username}</CardTitle>
-                                        {(m.status === 'inprogress' || m.status === 'disputed') && (
-                                            <Button 
-                                                size="sm" 
-                                                onClick={() => handleDeclareWinner(m.matchId, player, m.players, m.entryFee)} 
-                                                disabled={isSubmitting[`${m.matchId}-${player.uid}`]}
-                                            >
-                                                 {isSubmitting[`${m.matchId}-${player.uid}`] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                                Declare Winner
-                                            </Button>
-                                        )}
-                                    </CardHeader>
-                                    <CardContent>
-                                        {submission ? (
-                                            <div className="space-y-4">
-                                                <Button asChild variant="secondary">
-                                                    <a href={submission.screenshotUrl} target="_blank" rel="noopener noreferrer">View Screenshot</a>
-                                                </Button>
-                                            </div>
-                                        ) : (
-                                            <div className="flex flex-col items-center justify-center text-center h-24 text-muted-foreground">
-                                                <UserX className="h-8 w-8 mb-2" />
-                                                <p>No submission from this player.</p>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )
-                        })}
-                    </div>
-                    <DialogFooter>
-                        <p className="text-sm text-muted-foreground">Match Status: <Badge variant="secondary">{m.status}</Badge></p>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <div className="space-x-2 flex">
+                {(m.status === 'inprogress' || m.status === 'disputed') && (
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" disabled={submissions.length === 0}>
+                                View Results {submissions.length > 0 && `(${submissions.length})`}
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl">
+                            <DialogHeader>
+                                <DialogTitle>Resolve Match: {m.title}</DialogTitle>
+                                <DialogDescription>Review player submissions and declare a winner. The prize pool will be automatically distributed with a 10% commission.</DialogDescription>
+                            </DialogHeader>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                                {m.players.map(player => {
+                                    const submission = m.resultSubmissions?.[player.uid];
+                                    return (
+                                        <Card key={player.uid}>
+                                            <CardHeader className="flex-row items-center justify-between">
+                                                <CardTitle>{player.username}</CardTitle>
+                                                {(m.status === 'inprogress' || m.status === 'disputed') && (
+                                                    <Button 
+                                                        size="sm" 
+                                                        onClick={() => handleDeclareWinner(m.matchId, player, m.players, m.entryFee)} 
+                                                        disabled={isSubmitting[`${m.matchId}-${player.uid}`]}
+                                                    >
+                                                        {isSubmitting[`${m.matchId}-${player.uid}`] && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                        Declare Winner
+                                                    </Button>
+                                                )}
+                                            </CardHeader>
+                                            <CardContent>
+                                                {submission ? (
+                                                    <div className="space-y-4">
+                                                        <Button asChild variant="secondary">
+                                                            <a href={submission.screenshotUrl} target="_blank" rel="noopener noreferrer">View Screenshot</a>
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col items-center justify-center text-center h-24 text-muted-foreground">
+                                                        <UserX className="h-8 w-8 mb-2" />
+                                                        <p>No submission from this player.</p>
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    )
+                                })}
+                            </div>
+                            <DialogFooter>
+                                <p className="text-sm text-muted-foreground">Match Status: <Badge variant="secondary">{m.status}</Badge></p>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                )}
+                 <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="icon" disabled={isSubmitting[`delete-${m.matchId}`]}>
+                        {isSubmitting[`delete-${m.matchId}`] ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete the match
+                          and remove it from the database.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDeleteMatch(m.matchId)}>
+                          Continue
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+            </div>
         )
     }}
   ];
@@ -430,7 +481,7 @@ export default function AdminPage() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Admin Responsibility</AlertTitle>
           <AlertDescription>
-            You are responsible for all manual transactions. Verify payments before approving deposits and send payments before approving withdrawals. Declaring a match winner is final and will automatically transfer funds.
+            You are responsible for all manual transactions. Verify payments before approving deposits and send payments before approving withdrawals. Declaring a match winner is final and will automatically transfer funds. Deleting a match is permanent.
           </AlertDescription>
         </Alert>
 
@@ -503,5 +554,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    

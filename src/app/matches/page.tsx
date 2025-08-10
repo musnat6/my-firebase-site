@@ -8,15 +8,17 @@ import { useRouter } from 'next/navigation';
 import { Home, Loader2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { CardContent } from '@/components/ui/card';
+import { useAuth } from '@/hooks/use-auth';
 
 export default function MatchesPage() {
-    const { matches, loading } = useUserMatches();
+    const { user } = useAuth();
+    const { matches, loading } = useUserMatches(user?.uid);
     const router = useRouter();
 
     return (
         <div className="flex min-h-screen w-full flex-col bg-muted/40">
             <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6">
-                <h1 className="text-xl font-headline font-bold">All Matches</h1>
+                <h1 className="text-xl font-headline font-bold">My Matches</h1>
                 <Button onClick={() => router.push('/')} variant="outline">
                     <Home className="mr-2 h-4 w-4" />
                     Back to Home
@@ -44,5 +46,3 @@ export default function MatchesPage() {
         </div>
     );
 }
-
-    
