@@ -1,49 +1,52 @@
 
 'use client';
 
-import React, {
+import {
   createContext,
-  useContext,
-  useState,
-  useEffect,
   ReactNode,
+  useContext,
+  useEffect,
+  useState,
 } from 'react';
 import {
+  Auth,
+  getAuth,
+  GoogleAuthProvider,
   onAuthStateChanged,
-  User as FirebaseUser,
-  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
-  GoogleAuthProvider,
   signOut as firebaseSignOut,
-  updateProfile,
+  User as FirebaseUser,
+  createUserWithEmailAndPassword,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import {
+  doc,
+  getDoc,
+  getFirestore,
+  Firestore,
+  setDoc,
+} from 'firebase/firestore';
+
+import { app } from '@/lib/firebase';
 import type { User } from '@/types';
+import { mockUser } from '@/lib/data';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signUpWithEmail: (email: string, password: string, username: string) => Promise<void>;
-  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signInWithEmail: (email: string, pass: string) => Promise<void>;
+  signUpWithEmail: (email: string, pass: string, username: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
-
-export function AuthProvider({ children }: { children: ReactNode }) {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const auth: Auth = getAuth(app);
+  const db: Firestore = getFirestore(app);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -51,17 +54,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
-          setUser(userDoc.data() as User);
+          setUser({ uid: firebaseUser.uid, ...userDoc.data() } as User);
         } else {
-          // If the user signed up with Google for the first time
-          const displayName = firebaseUser.displayName || 'New User';
-          const photoURL = firebaseUser.photoURL || `https://placehold.co/100x100`;
-          
-          const newUser: User = {
+          // If user exists in auth but not firestore, create them
+           const newUser: User = {
             uid: firebaseUser.uid,
             email: firebaseUser.email!,
-            username: displayName,
-            profilePic: photoURL,
+            username: firebaseUser.displayName || 'New User',
+            profilePic: firebaseUser.photoURL || `https://placehold.co/100x100`,
             balance: 0,
             role: 'player',
             stats: { wins: 0, losses: 0, earnings: 0 },
@@ -76,26 +76,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [auth, db]);
 
   const signUpWithEmail = async (email: string, password: string, username: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const photoURL = `https://placehold.co/100x100`;
-    
-    // update firebase auth profile
-    await updateProfile(userCredential.user, { displayName: username, photoURL: photoURL });
-
-    // create user document in firestore
+    const firebaseUser = userCredential.user;
     const newUser: User = {
-      uid: userCredential.user.uid,
-      email: userCredential.user.email!,
+      uid: firebaseUser.uid,
+      email: firebaseUser.email!,
       username: username,
-      profilePic: photoURL,
+      profilePic: `https://placehold.co/100x100`,
       balance: 0,
       role: 'player',
       stats: { wins: 0, losses: 0, earnings: 0 },
     };
-    await setDoc(doc(db, 'users', newUser.uid), newUser);
+    await setDoc(doc(db, "users", firebaseUser.uid), newUser);
     setUser(newUser);
   };
 
@@ -105,25 +100,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    const result = await signInWithPopup(auth, provider);
+    const firebaseUser = result.user;
+
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    const userDoc = await getDoc(userDocRef);
+
+    if (!userDoc.exists()) {
+       const newUser: User = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email!,
+        username: firebaseUser.displayName || 'New User',
+        profilePic: firebaseUser.photoURL || `https://placehold.co/100x100`,
+        balance: 0,
+        role: 'player',
+        stats: { wins: 0, losses: 0, earnings: 0 },
+      };
+      await setDoc(userDocRef, newUser);
+      setUser(newUser);
+    }
   };
 
   const signOut = async () => {
     await firebaseSignOut(auth);
+    setUser(null);
   };
 
   const value = {
     user,
     loading,
-    signUpWithEmail,
     signInWithEmail,
+    signUpWithEmail,
     signInWithGoogle,
     signOut,
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
-}
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
