@@ -86,10 +86,16 @@ function ResultSubmissionCard({
 
         } catch (error) {
             console.error('Error submitting result:', error);
-            const errorMessage = (error instanceof Error && error.message) ? error.message : "An unknown error occurred.";
+            let errorMessage = "An unknown error occurred during submission.";
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            } else if (typeof error === 'object' && error !== null && 'message' in error) {
+                errorMessage = String((error as { message: unknown }).message);
+            }
+            
             toast({
                 title: 'Submission Failed',
-                description: errorMessage,
+                description: `AI Verification Failed: ${errorMessage}`,
                 variant: 'destructive',
             });
             setIsVerifying(false);
