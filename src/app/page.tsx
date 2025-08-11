@@ -63,8 +63,6 @@ import { addDoc, collection, doc, onSnapshot, runTransaction, serverTimestamp, g
 import { db } from '@/lib/firebase';
 import { LeaderboardTable } from '@/components/leaderboard-table';
 import { useUserMatches } from '@/hooks/use-user-matches';
-import { suggestOpponents, SuggestOpponentsOutput } from '@/ai/flows/suggest-opponents';
-import { generateMatchDescription } from '@/ai/flows/generate-match-description';
 import { Textarea } from '@/components/ui/textarea';
 import type { PaymentSettings, User, AppNotification } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
@@ -77,8 +75,6 @@ export default function DashboardPage() {
   const { matches, loading: matchesLoading } = useUserMatches();
   const [openDialog, setOpenDialog] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [opponentSuggestions, setOpponentSuggestions] = useState<SuggestOpponentsOutput>([]);
-  const [isSuggesting, setIsSuggesting] = useState(false);
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>({ number: 'Loading...' });
   const [hasCopied, setHasCopied] = useState(false);
 
@@ -94,7 +90,6 @@ export default function DashboardPage() {
   const [matchTitle, setMatchTitle] = useState('');
   const [matchDescription, setMatchDescription] = useState('');
   const [entryFee, setEntryFee] = useState('');
-  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
   const [withdrawError, setWithdrawError] = useState('');
   const [createMatchError, setCreateMatchError] = useState('');
 
@@ -188,26 +183,6 @@ export default function DashboardPage() {
     }
   }, [entryFee, user]);
   
-  const handleGenerateDescription = async () => {
-    if (!entryFee) {
-        toast({ title: 'Entry Fee Required', description: 'Please enter an entry fee first.', variant: 'destructive' });
-        return;
-    }
-    setIsGeneratingDesc(true);
-    try {
-        const result = await generateMatchDescription({
-            entryFee: Number(entryFee),
-            gameType: '1v1', // This can be dynamic in the future
-        });
-        setMatchDescription(result.description);
-    } catch (error) {
-        console.error("Error generating match description:", error);
-        toast({ title: 'Error', description: 'Could not generate a description.', variant: 'destructive' });
-    } finally {
-        setIsGeneratingDesc(false);
-    }
-  };
-
 
   if (loading || !user) {
     return (
@@ -217,32 +192,8 @@ export default function DashboardPage() {
     );
   }
 
-  const handleQuickAction = async (action: string) => {
+  const handleQuickAction = (action: string) => {
     setOpenDialog(action);
-    if (action === 'suggestOpponents') {
-      setIsSuggesting(true);
-      try {
-        const winLossRatio = user.stats.losses > 0 ? user.stats.wins / user.stats.losses : user.stats.wins;
-        // Fetch recent users to pass to the flow
-        const usersQuery = query(collection(db, 'users'), where('uid', '!=', user.uid), limit(20));
-        const usersSnapshot = await getDocs(usersQuery);
-        const activePlayers = usersSnapshot.docs.map(doc => doc.data() as User);
-        
-        const suggestions = await suggestOpponents({
-          userId: user.uid,
-          winLossRatio: winLossRatio,
-          gameType: '1v1', // Or make this selectable
-          numOpponents: 3,
-          activePlayers: activePlayers,
-        });
-        setOpponentSuggestions(suggestions);
-      } catch (error) {
-        console.error("Error suggesting opponents:", error);
-        toast({ title: 'Error', description: 'Could not fetch opponent suggestions.', variant: 'destructive' });
-      } finally {
-        setIsSuggesting(false);
-      }
-    }
   };
 
   const closeDialog = () => {
@@ -256,7 +207,6 @@ export default function DashboardPage() {
     setMatchDescription('');
     setEntryFee('');
     setCreateMatchError('');
-    setOpponentSuggestions([]);
     setHasCopied(false);
   };
 
@@ -492,7 +442,7 @@ export default function DashboardPage() {
                                 <div className={`col-start-2 grid gap-1 ${!notification.readBy.includes(user.uid) ? '' : 'pl-[25px]'}`}>
                                   <p className="text-sm font-medium">{notification.message}</p>
                                   <p className="text-sm text-muted-foreground">
-                                    {formatDistanceToNow(notification.createdAt.toDate(), { addSuffix: true })}
+                                    {notification.createdAt ? formatDistanceToNow(notification.createdAt.toDate(), { addSuffix: true }) : 'Just now'}
                                   </p>
                                 </div>
                               </div>
@@ -567,9 +517,6 @@ export default function DashboardPage() {
                   </Button>
                   <Button size="lg" variant="outline" onClick={() => handleQuickAction('withdraw')}>
                     <Banknote className="mr-2 h-5 w-5" /> Withdraw Winnings
-                  </Button>
-                  <Button size="lg" variant="outline" className="text-primary border-primary hover:bg-primary/10 hover:text-primary" onClick={() => handleQuickAction('suggestOpponents')}>
-                    <Users className="mr-2 h-5 w-5" /> Suggest Opponents
                   </Button>
                 </CardContent>
               </Card>
@@ -679,39 +626,13 @@ export default function DashboardPage() {
                             <Label htmlFor="description">Match Description</Label>
                             <div className="relative">
                                 <Textarea id="description" placeholder="A short, exciting description..." required value={matchDescription} onChange={(e) => setMatchDescription(e.target.value)} rows={3}/>
-                                <Button type="button" size="sm" variant="outline" onClick={handleGenerateDescription} disabled={isGeneratingDesc || !entryFee} className="absolute bottom-2 right-2">
-                                     {isGeneratingDesc && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    AI Gen
-                                </Button>
                             </div>
                         </div>
                         </>
                     )}
                     {openDialog === 'suggestOpponents' && (
                         <div className="grid gap-4">
-                          {isSuggesting ? (
-                            <div className="flex items-center justify-center h-24">
-                              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                            </div>
-                          ) : opponentSuggestions.length > 0 ? (
-                            opponentSuggestions.map((opp) => (
-                              <Card key={opp.userId}>
-                                <CardContent className="flex items-center gap-4 p-4">
-                                  <div className="flex-grow">
-                                    <h3 className="font-bold text-lg">{opp.username}</h3>
-                                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                                      <span>W/L: {opp.winLossRatio.toFixed(2)}</span>
-                                      <span>Wins: {opp.stats?.wins ?? 'N/A'}</span>
-                                      <span>Earnings: {opp.stats?.earnings ?? 'N/A'}৳</span>
-                                    </div>
-                                  </div>
-                                  <Button size="sm">Challenge</Button>
-                                </CardContent>
-                              </Card>
-                            ))
-                          ) : (
-                             <p className="text-center text-muted-foreground">No suitable opponents found.</p>
-                          )}
+                            <p className="text-center text-muted-foreground">This feature is currently unavailable.</p>
                         </div>
                     )}
                     </div>
