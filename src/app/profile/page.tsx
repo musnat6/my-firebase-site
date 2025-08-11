@@ -45,8 +45,6 @@ export default function ProfilePage() {
             const formData = new FormData();
             formData.append('image', file);
             
-            // NOTE: The API key is hardcoded here as requested in the prompt. 
-            // In a real-world scenario, this should be in an environment variable.
             const response = await fetch(`https://api.imgbb.com/1/upload?key=0d6a83905e89021c4c45331ba0263e81`, {
                 method: 'POST',
                 body: formData,

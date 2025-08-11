@@ -27,23 +27,31 @@ export default function WalletPage() {
 
         const depositsQuery = query(
             collection(db, 'deposits'),
-            where('userId', '==', user.uid)
+            where('userId', '==', user.uid),
+            orderBy('timestamp', 'desc')
         );
         
         const withdrawalsQuery = query(
             collection(db, 'withdrawals'),
-            where('userId', '==', user.uid)
+            where('userId', '==', user.uid),
+            orderBy('timestamp', 'desc')
         );
 
         const unsubDeposits = onSnapshot(depositsQuery, (snapshot) => {
-            const userDeposits = snapshot.docs.map(doc => ({ ...doc.data(), type: 'deposit' } as Transaction));
-            setTransactions(prev => [...userDeposits, ...prev.filter(t => t.type !== 'deposit')].sort((a, b) => b.timestamp - a.timestamp));
-            setTxLoading(false);
+            const userDeposits = snapshot.docs.map(doc => ({ ...doc.data({ serverTimestamps: 'estimate' }), type: 'deposit' } as Transaction));
+            setTransactions(prev => 
+                [...userDeposits, ...prev.filter(t => t.type !== 'deposit')]
+                .sort((a, b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0))
+            );
+             setTxLoading(false);
         });
 
         const unsubWithdrawals = onSnapshot(withdrawalsQuery, (snapshot) => {
-            const userWithdrawals = snapshot.docs.map(doc => ({ ...doc.data(), type: 'withdrawal' } as Transaction));
-            setTransactions(prev => [...userWithdrawals, ...prev.filter(t => t.type !== 'withdrawal')].sort((a, b) => b.timestamp - a.timestamp));
+            const userWithdrawals = snapshot.docs.map(doc => ({ ...doc.data({ serverTimestamps: 'estimate' }), type: 'withdrawal' } as Transaction));
+            setTransactions(prev => 
+                [...userWithdrawals, ...prev.filter(t => t.type !== 'withdrawal')]
+                .sort((a, b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0))
+            );
             setTxLoading(false);
         });
         
@@ -121,7 +129,9 @@ export default function WalletPage() {
                                             }
                                             <div>
                                                 <p className="font-semibold capitalize">{tx.type}</p>
-                                                <p className="text-sm text-muted-foreground">{format(new Date(tx.timestamp), "MMM d, yyyy 'at' h:mm a")}</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                  {tx.timestamp ? format(tx.timestamp.toDate(), "MMM d, yyyy 'at' h:mm a") : 'Date unavailable'}
+                                                </p>
                                             </div>
                                         </div>
                                         <div className="text-right">
