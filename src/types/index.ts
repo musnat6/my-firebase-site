@@ -92,5 +92,3 @@ export interface AppNotification {
     creatorId: string;
     creatorUsername: string;
 }
-
-    

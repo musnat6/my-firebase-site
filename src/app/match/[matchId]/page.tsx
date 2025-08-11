@@ -44,7 +44,7 @@ function ResultSubmissionCard({
             
             const apiKey = process.env.NEXT_PUBLIC_IMGBB_API_KEY;
             if (!apiKey) {
-                throw new Error("ImgBB API key is not configured. Please add it to your environment variables.");
+                throw new Error("ImgBB API key is not configured. Please contact support.");
             }
 
             const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
@@ -295,5 +295,3 @@ export default function MatchDetailPage({ params }: { params: { matchId: string 
     </div>
   );
 }
-
-    

@@ -171,5 +171,3 @@ export function AdminDataTable<TData, TValue>({
     </Card>
   );
 }
-
-    
