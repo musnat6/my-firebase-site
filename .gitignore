@@ -4,6 +4,7 @@
 /node_modules
 /.pnp
 .pnp.js
+.yarn/install-state.gz
 
 # testing
 /coverage
@@ -38,4 +39,9 @@ pnpm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-    
+# studio
+.studio-state.json
+.studio-credentials.json
+
+# Don't commit the .env file
+.env
