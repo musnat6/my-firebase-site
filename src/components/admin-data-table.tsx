@@ -7,10 +7,7 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
-<<<<<<< HEAD
   getPaginationRowModel, // Import pagination
-=======
->>>>>>> origin/main
   useReactTable,
 } from '@tanstack/react-table';
 import {
@@ -30,11 +27,8 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
-<<<<<<< HEAD
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Button } from './ui/button';
-=======
->>>>>>> origin/main
 
 interface AdminDataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -63,7 +57,6 @@ export function AdminDataTable<TData, TValue>({
     getCoreRowModel: getCoreRowModel(),
     onGlobalFilterChange: setGlobalFilter,
     getFilteredRowModel: getFilteredRowModel(),
-<<<<<<< HEAD
     getPaginationRowModel: getPaginationRowModel(), // Enable pagination
     state: {
       globalFilter,
@@ -73,17 +66,11 @@ export function AdminDataTable<TData, TValue>({
         pageSize: 10,
       }
     }
-=======
-    state: {
-      globalFilter,
-    },
->>>>>>> origin/main
   });
 
   return (
     <Card>
       <CardHeader>
-<<<<<<< HEAD
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex-1">
                 <CardTitle>{title}</CardTitle>
@@ -101,21 +88,6 @@ export function AdminDataTable<TData, TValue>({
       </CardHeader>
       <CardContent>
         <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-=======
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-        <Input
-          placeholder={searchText}
-          value={globalFilter ?? ''}
-          onChange={(event) =>
-            setGlobalFilter(String(event.target.value))
-          }
-          className="max-w-sm"
-        />
-      </CardHeader>
-      <CardContent>
-        <div className="rounded-md border overflow-x-auto">
->>>>>>> origin/main
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
@@ -154,11 +126,7 @@ export function AdminDataTable<TData, TValue>({
                     data-state={row.getIsSelected() && 'selected'}
                   >
                     {row.getVisibleCells().map((cell) => (
-<<<<<<< HEAD
                       <TableCell key={cell.id} className="p-2 sm:p-4">
-=======
-                      <TableCell key={cell.id}>
->>>>>>> origin/main
                         {flexRender(
                           cell.column.columnDef.cell,
                           cell.getContext()
@@ -179,7 +147,6 @@ export function AdminDataTable<TData, TValue>({
               )}
             </TableBody>
           </Table>
-<<<<<<< HEAD
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
         <div className="flex items-center justify-end space-x-2 py-4">
@@ -199,15 +166,10 @@ export function AdminDataTable<TData, TValue>({
             >
                 Next
             </Button>
-=======
->>>>>>> origin/main
         </div>
       </CardContent>
     </Card>
   );
 }
-<<<<<<< HEAD
 
     
-=======
->>>>>>> origin/main

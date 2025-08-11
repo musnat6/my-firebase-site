@@ -3,11 +3,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-<<<<<<< HEAD
 import { Home, Gavel, Video, Gamepad2, AlertTriangle, FileText, UserCheck } from 'lucide-react';
-=======
-import { Home, Gavel, Video, Gamepad2, AlertTriangle, FileText } from 'lucide-react';
->>>>>>> origin/main
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -20,7 +16,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const rulesEn = [
   {
-<<<<<<< HEAD
     icon: UserCheck,
     title: 'Username and Screenshot are Critical',
     content: 'You must set your correct eFootball in-game username on your profile page. Submitted screenshots MUST clearly show the final score AND both players\' in-game usernames. This is how admins will verify the winner. Failure to do so may result in a loss.',
@@ -29,11 +24,6 @@ const rulesEn = [
     icon: Video,
     title: 'Screen Recording is Mandatory',
     content: 'Both players must screen record the entire match, from room creation to the final result screen. This is your primary proof in case of complex disputes.',
-=======
-    icon: Video,
-    title: 'Screen Recording is Mandatory',
-    content: 'Both players must screen record the entire match, from room creation to the final result screen. This is your primary proof in case of disputes.',
->>>>>>> origin/main
   },
   {
     icon: Gamepad2,
@@ -43,11 +33,7 @@ const rulesEn = [
   {
     icon: FileText,
     title: 'Result Submission',
-<<<<<<< HEAD
     content: 'The winner must submit a screenshot of the final score within 1 hour of the match starting. If the loser also wants to submit for confirmation or dispute, they may do so. If only one player submits, their result will be considered final, provided it meets the username criteria.',
-=======
-    content: 'Both winner and loser must submit a screenshot of the final score within 1 hour of the match starting. If only one player submits, their result will be considered final.',
->>>>>>> origin/main
   },
   {
     icon: AlertTriangle,
@@ -58,7 +44,6 @@ const rulesEn = [
 
 const rulesBn = [
     {
-<<<<<<< HEAD
       icon: UserCheck,
       title: 'ইউজারনেম এবং স্ক্রিনশট অত্যন্ত গুরুত্বপূর্ণ',
       content: 'আপনাকে অবশ্যই আপনার প্রোফাইল পেজে আপনার সঠিক eFootball ইন-গেম ইউজারনেম সেট করতে হবে। জমা দেওয়া স্ক্রিনশটে অবশ্যই চূড়ান্ত স্কোর এবং উভয় খেলোয়াড়ের ইন-গেম ইউজারনেম পরিষ্কারভাবে দেখাতে হবে। অ্যাডমিনরা এভাবেই বিজয়ী যাচাই করবেন। এটি করতে ব্যর্থ হলে আপনাকে পরাজিত ঘোষণা করা হতে পারে।',
@@ -67,11 +52,6 @@ const rulesBn = [
       icon: Video,
       title: 'স্ক্রিন রেকর্ডিং বাধ্যতামূলক',
       content: 'উভয় খেলোয়াড়কে অবশ্যই রুম তৈরি থেকে শুরু করে চূড়ান্ত ফলাফল স্ক্রিন পর্যন্ত পুরো ম্যাচটি স্ক্রিন রেকর্ড করতে হবে। জটিল বিরোধের ক্ষেত্রে এটি আপনার প্রাথমিক প্রমাণ।',
-=======
-      icon: Video,
-      title: 'স্ক্রিন রেকর্ডিং বাধ্যতামূলক',
-      content: 'উভয় খেলোয়াড়কে অবশ্যই রুম তৈরি থেকে শুরু করে চূড়ান্ত ফলাফল স্ক্রিন পর্যন্ত পুরো ম্যাচটি স্ক্রিন রেকর্ড করতে হবে। বিরোধের ক্ষেত্রে এটি আপনার প্রাথমিক প্রমাণ।',
->>>>>>> origin/main
     },
     {
       icon: Gamepad2,
@@ -81,11 +61,7 @@ const rulesBn = [
     {
       icon: FileText,
       title: 'ফলাফল জমা দেওয়া',
-<<<<<<< HEAD
       content: 'ম্যাচ শুরুর ১ ঘণ্টার মধ্যে বিজয়ীকে অবশ্যই চূড়ান্ত স্কোরের একটি স্ক্রিনশট জমা দিতে হবে। পরাজিত খেলোয়াড়ও নিশ্চিতকরণ বা বিরোধের জন্য জমা দিতে পারেন। যদি শুধুমাত্র একজন খেলোয়াড় জমা দেন, তবে তার ফলাফলই চূড়ান্ত বলে বিবেচিত হবে, যদি তা ইউজারনেমের শর্ত পূরণ করে।',
-=======
-      content: 'ম্যাচ শুরুর ১ ঘণ্টার মধ্যে বিজয়ী এবং পরাজিত উভয়কেই চূড়ান্ত স্কোরের একটি স্ক্রিনশট জমা দিতে হবে। যদি শুধুমাত্র একজন খেলোয়াড় জমা দেন, তবে তার ফলাফলই চূড়ান্ত বলে বিবেচিত হবে।',
->>>>>>> origin/main
     },
     {
       icon: AlertTriangle,
@@ -107,25 +83,15 @@ export default function RulesPage() {
           <h1 className="text-xl font-headline font-bold">Rules & System</h1>
         </div>
         <div className="flex items-center gap-2">
-<<<<<<< HEAD
             <Tabs value={language} onValueChange={setLanguage} className="w-full max-w-[150px] sm:max-w-[200px]">
-=======
-            <Tabs value={language} onValueChange={setLanguage} className="w-[200px]">
->>>>>>> origin/main
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="en">English</TabsTrigger>
                     <TabsTrigger value="bn">বাংলা</TabsTrigger>
                 </TabsList>
             </Tabs>
-<<<<<<< HEAD
             <Button onClick={() => router.push('/')} variant="outline" size="sm" className="shrink-0">
                 <Home className="mr-0 h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Home</span>
-=======
-            <Button onClick={() => router.push('/')} variant="outline">
-                <Home className="mr-2 h-4 w-4" />
-                Home
->>>>>>> origin/main
             </Button>
         </div>
       </header>
@@ -138,17 +104,10 @@ export default function RulesPage() {
             <Accordion type="single" collapsible className="w-full" defaultValue="item-0">
               {rules.map((rule, index) => (
                 <AccordionItem key={index} value={`item-${index}`}>
-<<<<<<< HEAD
                   <AccordionTrigger className="text-lg font-semibold hover:no-underline text-left">
                     <div className="flex items-center gap-3">
                         <rule.icon className="h-5 w-5 text-primary shrink-0" />
                         <span>{rule.title}</span>
-=======
-                  <AccordionTrigger className="text-lg font-semibold hover:no-underline">
-                    <div className="flex items-center gap-3">
-                        <rule.icon className="h-5 w-5 text-primary" />
-                        {rule.title}
->>>>>>> origin/main
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="text-base text-muted-foreground pl-10">
@@ -163,3 +122,5 @@ export default function RulesPage() {
     </div>
   );
 }
+
+    

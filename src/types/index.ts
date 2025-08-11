@@ -11,10 +11,7 @@ export interface User {
   uid: string;
   username: string;
   email: string;
-<<<<<<< HEAD
   efootballUsername: string;
-=======
->>>>>>> origin/main
   profilePic: string;
   balance: number;
   role: 'player' | 'admin';
@@ -95,8 +92,5 @@ export interface AppNotification {
     creatorId: string;
     creatorUsername: string;
 }
-<<<<<<< HEAD
-=======
 
     
->>>>>>> origin/main
