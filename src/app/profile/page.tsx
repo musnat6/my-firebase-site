@@ -8,19 +8,28 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAuth } from '@/hooks/use-auth';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarSelector } from '@/components/avatar-selector';
 
 export default function ProfilePage() {
     const router = useRouter();
     const { user, loading } = useAuth();
     const { toast } = useToast();
-    const [username, setUsername] = useState(user?.username || '');
-    const [profilePic, setProfilePic] = useState(user?.profilePic || '');
+    
+    const [username, setUsername] = useState('');
+    const [profilePic, setProfilePic] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        if (user) {
+            setUsername(user.username || '');
+            setProfilePic(user.profilePic || '');
+        }
+    }, [user]);
 
     if (loading || !user) {
         return (
@@ -76,30 +85,27 @@ export default function ProfilePage() {
                             <CardDescription>Update your username and profile picture.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            <div className="flex items-center gap-4">
-                                <Avatar className="h-20 w-20">
-                                    <AvatarImage src={profilePic || user.profilePic} alt={username} />
-                                    <AvatarFallback className="text-2xl">{username?.charAt(0)}</AvatarFallback>
+                            <div className="flex items-center gap-6">
+                                <Avatar className="h-24 w-24">
+                                    <AvatarImage src={profilePic} alt={username} />
+                                    <AvatarFallback className="text-3xl">{username?.charAt(0)}</AvatarFallback>
                                 </Avatar>
                                 <div className="grid gap-2 w-full">
-                                    <Label htmlFor="profilePic">Profile Picture URL</Label>
+                                    <Label htmlFor="username">Username</Label>
                                     <Input 
-                                        id="profilePic" 
-                                        value={profilePic} 
-                                        onChange={(e) => setProfilePic(e.target.value)}
-                                        placeholder="https://example.com/image.png"
+                                        id="username" 
+                                        value={username} 
+                                        onChange={(e) => setUsername(e.target.value)}
+                                        required
                                     />
                                 </div>
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="username">Username</Label>
-                                <Input 
-                                    id="username" 
-                                    value={username} 
-                                    onChange={(e) => setUsername(e.target.value)}
-                                    required
-                                />
+
+                             <div className="grid gap-2">
+                                <Label>Choose Your Avatar</Label>
+                                <AvatarSelector selectedAvatar={profilePic} onSelectAvatar={setProfilePic} />
                             </div>
+
                             <div className="grid gap-2">
                                 <Label htmlFor="email">Email</Label>
                                 <Input id="email" value={user.email} disabled />

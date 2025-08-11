@@ -26,13 +26,12 @@ import {
 
 import { app } from '@/lib/firebase';
 import type { User } from '@/types';
-import { generateIconDataUri } from '@/lib/icon-generator.tsx';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
-  signUpWithEmail: (email: string, pass: string, username: string) => Promise<void>;
+  signUpWithEmail: (email: string, pass: string, username: string, profilePic: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -69,18 +68,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => authUnsubscribe();
   }, [auth, db]);
 
-  const signUpWithEmail = async (email: string, password: string, username: string) => {
+  const signUpWithEmail = async (email: string, password: string, username: string, profilePic: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
-    
-    // Generate a unique, colorful SVG icon for the new user.
-    const profilePic = generateIconDataUri(username);
 
     const newUser: User = {
       uid: firebaseUser.uid,
       email: firebaseUser.email!,
-      username: username, // Use the provided username
-      profilePic: profilePic, // Use the generated icon
+      username: username,
+      profilePic: profilePic,
       balance: 0,
       role: 'player',
       stats: { wins: 0, losses: 0, earnings: 0 },

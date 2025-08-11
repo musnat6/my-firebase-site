@@ -1,6 +1,8 @@
 
+'use client';
+
+// This file is no longer used for user profile pictures but is kept for generating match icons.
 import * as React from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 
 const colors = [
   '#4285F4', '#FFCA28', '#34A853', '#EA4335',
@@ -17,7 +19,7 @@ function simpleHash(str: string): number {
   return Math.abs(hash);
 }
 
-const GeneratedIcon: React.FC<{ seed: string }> = ({ seed }) => {
+export const GeneratedIcon: React.FC<{ seed: string }> = ({ seed }) => {
   const hash = simpleHash(seed);
   const bgColor = colors[hash % colors.length];
   const shapeColor = colors[(hash + 3) % colors.length];
@@ -52,9 +54,3 @@ const GeneratedIcon: React.FC<{ seed: string }> = ({ seed }) => {
     </svg>
   );
 };
-
-export function generateIconDataUri(seed: string): string {
-  const svgString = renderToStaticMarkup(React.createElement(GeneratedIcon, { seed }));
-  const base64Svg = Buffer.from(svgString).toString('base64');
-  return `data:image/svg+xml;base64,${base64Svg}`;
-}

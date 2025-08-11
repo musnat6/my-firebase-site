@@ -17,11 +17,14 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { AvatarSelector } from '@/components/avatar-selector';
+import { avatars } from '@/lib/avatars';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+  const [selectedAvatar, setSelectedAvatar] = useState(avatars[0].src);
   const { signUpWithEmail } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
@@ -37,7 +40,7 @@ export default function SignupPage() {
         return;
     }
     try {
-      await signUpWithEmail(email, password, username);
+      await signUpWithEmail(email, password, username, selectedAvatar);
       toast({ title: 'Sign Up Successful', description: "Welcome to Arena Clash!" });
       router.push('/');
     } catch (error) {
@@ -51,19 +54,23 @@ export default function SignupPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
+      <Card className="w-full max-w-md">
         <CardHeader className="text-center">
             <div className="flex justify-center items-center gap-3 mb-4">
                 <Image src="/logo.svg" alt="Arena Clash" width={40} height={40} data-ai-hint="logo" />
                 <h1 className="text-3xl font-headline font-bold">Arena Clash</h1>
             </div>
-          <CardTitle className="text-2xl font-headline">Sign Up</CardTitle>
+          <CardTitle className="text-2xl font-headline">Create an Account</CardTitle>
           <CardDescription>
-            Create an account to start playing
+            Choose your avatar and username to start playing.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignup} className="grid gap-4">
+            <div className="grid gap-2">
+                <Label>Choose Your Avatar</Label>
+                <AvatarSelector selectedAvatar={selectedAvatar} onSelectAvatar={setSelectedAvatar} />
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="username">Username</Label>
               <Input
