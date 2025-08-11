@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Match, User, ResultSubmission, PlayerRef } from '@/types';
 import { useAuth } from '@/hooks/use-auth';
@@ -140,6 +140,34 @@ function ResultSubmissionCard({
 }
 
 
+function PlayerAvatar({ player }: { player: PlayerRef }) {
+  const [playerData, setPlayerData] = useState<User | null>(null);
+
+  useEffect(() => {
+    const playerRef = doc(db, 'users', player.uid);
+    const unsubscribe = onSnapshot(playerRef, (doc) => {
+      if (doc.exists()) {
+        setPlayerData(doc.data() as User);
+      }
+    });
+    return () => unsubscribe();
+  }, [player.uid]);
+
+  const username = playerData?.username || player.username;
+  const profilePic = playerData?.profilePic || player.profilePic;
+
+  return (
+    <div className="flex flex-col items-center gap-2 relative">
+      <Avatar className="h-20 w-20 border-4 border-primary/20">
+        <AvatarImage src={profilePic} alt={username} />
+        <AvatarFallback>{username ? username.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
+      </Avatar>
+      <span className="font-bold text-lg">{username || 'Player'}</span>
+    </div>
+  );
+}
+
+
 export default function MatchDetailPage() {
   const { matchId } = useParams();
   const { user, loading: authLoading } = useAuth();
@@ -205,14 +233,10 @@ export default function MatchDetailPage() {
                 <CardContent>
                      <div className="flex items-center justify-around">
                         {match.players.map((p, index) => (
-                           <div key={p.uid} className="flex flex-col items-center gap-2 relative">
-                                <Avatar className="h-20 w-20 border-4 border-primary/20">
-                                    <AvatarImage src={p.profilePic} alt={p.username} />
-                                    <AvatarFallback>{p.username ? p.username.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
-                                </Avatar>
-                                <span className="font-bold text-lg">{p.username || 'Player'}</span>
-                                { index === 0 && match.players.length > 1 && <Swords className="h-12 w-12 text-muted-foreground absolute top-1/2 left-full transform -translate-y-1/2 translate-x-4 z-10" />}
-                            </div>
+                           <React.Fragment key={p.uid}>
+                                <PlayerAvatar player={p} />
+                                { index === 0 && match.players.length > 1 && <Swords className="h-12 w-12 text-muted-foreground absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10" />}
+                            </React.Fragment>
                         ))}
                          {match.players.length === 1 && (
                             <>
