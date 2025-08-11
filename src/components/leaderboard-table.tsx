@@ -93,7 +93,7 @@ export function LeaderboardTable() {
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10">
                       <AvatarImage src={player.profilePic} alt={player.username} data-ai-hint="avatar" />
-                      <AvatarFallback>{player.username.charAt(0)}</AvatarFallback>
+                      <AvatarFallback>{player.username?.charAt(0).toUpperCase()}</AvatarFallback>
                     </Avatar>
                     <span className="font-medium truncate">{player.username}</span>
                   </div>

@@ -59,7 +59,8 @@ function ResultSubmissionCard({
                 
                 const matchRef = doc(db, 'matches', match.matchId);
                 await updateDoc(matchRef, {
-                    [`resultSubmissions.${player.uid}`]: newSubmission
+                    [`resultSubmissions.${player.uid}`]: newSubmission,
+                    status: 'disputed'
                 });
 
                 toast({ title: 'Result Submitted', description: 'Your result has been submitted for admin review.', className: 'bg-green-600 text-white' });
@@ -68,13 +69,8 @@ function ResultSubmissionCard({
             }
 
         } catch (error) {
-            let errorMessage = "An unknown error occurred during submission.";
-            if (error instanceof Error) {
-                errorMessage = error.message;
-            } else if (typeof error === 'object' && error !== null && 'message' in error) {
-                errorMessage = String((error as { message: unknown }).message);
-            }
-            
+            console.error("Error submitting result: ", error);
+            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
             toast({
                 title: 'Submission Failed',
                 description: errorMessage,
@@ -212,7 +208,7 @@ export default function MatchDetailPage() {
                            <div key={p.uid} className="flex flex-col items-center gap-2 relative">
                                 <Avatar className="h-20 w-20 border-4 border-primary/20">
                                     <AvatarImage src={p.profilePic} alt={p.username} />
-                                    <AvatarFallback>{p.username ? p.username.charAt(0) : 'P'}</AvatarFallback>
+                                    <AvatarFallback>{p.username ? p.username.charAt(0).toUpperCase() : 'P'}</AvatarFallback>
                                 </Avatar>
                                 <span className="font-bold text-lg">{p.username || 'Player'}</span>
                                 { index === 0 && match.players.length > 1 && <Swords className="h-12 w-12 text-muted-foreground absolute top-1/2 left-full transform -translate-y-1/2 translate-x-4 z-10" />}

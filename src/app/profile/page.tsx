@@ -88,7 +88,7 @@ export default function ProfilePage() {
                             <div className="flex items-center gap-6">
                                 <Avatar className="h-24 w-24">
                                     <AvatarImage src={profilePic} alt={username} />
-                                    <AvatarFallback className="text-3xl">{username?.charAt(0)}</AvatarFallback>
+                                    <AvatarFallback className="text-3xl">{username?.charAt(0).toUpperCase()}</AvatarFallback>
                                 </Avatar>
                                 <div className="grid gap-2 w-full">
                                     <Label htmlFor="username">Username</Label>

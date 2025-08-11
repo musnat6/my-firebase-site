@@ -42,7 +42,7 @@ export function UserNav() {
         <Button variant="ghost" className="relative h-10 w-10 rounded-full">
           <Avatar className="h-10 w-10 border-2 border-primary/50">
             <AvatarImage src={user.profilePic} alt={user.username} />
-            <AvatarFallback className="font-bold bg-primary/20">{user.username?.charAt(0)}</AvatarFallback>
+            <AvatarFallback className="font-bold bg-primary/20">{user.username?.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
