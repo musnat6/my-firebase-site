@@ -222,20 +222,25 @@ export default function AdminPage() {
     }
   };
   
-   const handleDeclareWinner = async (matchId: string, winner: PlayerRef, players: PlayerRef[], entryFee: number) => {
+  const handleDeclareWinner = async (matchId: string, winner: PlayerRef, players: PlayerRef[], entryFee: number) => {
     const submittingKey = `${matchId}-${winner.uid}`;
     setIsSubmitting(prev => ({ ...prev, [submittingKey]: true }));
 
     const matchRef = doc(db, 'matches', matchId);
-    const winnerRef = doc(db, 'users', winner.uid);
 
     try {
         await runTransaction(db, async (transaction) => {
+            // --- 1. READ PHASE ---
+            const winnerRef = doc(db, 'users', winner.uid);
             const winnerDoc = await transaction.get(winnerRef);
             if (!winnerDoc.exists()) {
                 throw new Error(`Winner (${winner.username}) not found!`);
             }
             
+            const loserRefs = players.filter(p => p.uid !== winner.uid).map(p => doc(db, 'users', p.uid));
+            const loserDocs = await Promise.all(loserRefs.map(ref => transaction.get(ref)));
+
+            // --- 2. CALCULATION PHASE ---
             const prizePool = entryFee * players.length;
             const commission = prizePool * 0.10; // 10% commission
             const winnerPrize = prizePool - commission;
@@ -250,6 +255,7 @@ export default function AdminPage() {
                 earnings: currentStats.earnings + winnerPrize,
             };
 
+            // --- 3. WRITE PHASE ---
             // Update winner's balance and stats
             transaction.update(winnerRef, { 
                 balance: newBalance,
@@ -257,17 +263,14 @@ export default function AdminPage() {
             });
 
             // Update stats for all other players (as losses)
-            for (const player of players) {
-                if (player.uid !== winner.uid) {
-                    const loserRef = doc(db, 'users', player.uid);
-                    const loserDoc = await transaction.get(loserRef);
-                    if (loserDoc.exists()) {
-                         const currentLoserStats = loserDoc.data().stats || { wins: 0, losses: 0, earnings: 0 };
-                         const newLoserStats = { ...currentLoserStats, losses: currentLoserStats.losses + 1 };
-                         transaction.update(loserRef, { stats: newLoserStats });
-                    }
+            loserDocs.forEach((loserDoc, index) => {
+                if (loserDoc.exists()) {
+                    const loserRef = loserRefs[index];
+                    const currentLoserStats = loserDoc.data().stats || { wins: 0, losses: 0, earnings: 0 };
+                    const newLoserStats = { ...currentLoserStats, losses: currentLoserStats.losses + 1 };
+                    transaction.update(loserRef, { stats: newLoserStats });
                 }
-            }
+            });
             
             // Update match status
             transaction.update(matchRef, { status: 'completed', winner: winner });
@@ -285,7 +288,7 @@ export default function AdminPage() {
     } finally {
         setIsSubmitting(prev => ({ ...prev, [submittingKey]: false }));
     }
-  };
+};
 
   const handleDeleteMatch = async (matchId: string) => {
     setIsSubmitting(prev => ({...prev, [`delete-${matchId}`]: true}));
@@ -302,17 +305,18 @@ export default function AdminPage() {
         const matchData = matchDoc.data() as Match;
 
         // If the match is open, refund all players
-        if (matchData.status === 'open') {
+        if (matchData.status === 'open' && matchData.players.length > 0) {
           const entryFee = matchData.entryFee;
-          for (const player of matchData.players) {
-            const playerRef = doc(db, 'users', player.uid);
-            const playerDoc = await transaction.get(playerRef);
-            if (playerDoc.exists()) {
-              const currentBalance = playerDoc.data().balance || 0;
-              const newBalance = currentBalance + entryFee;
-              transaction.update(playerRef, { balance: newBalance });
-            }
-          }
+          const playerRefs = matchData.players.map(player => doc(db, 'users', player.uid));
+          const playerDocs = await Promise.all(playerRefs.map(ref => transaction.get(ref)));
+
+          playerDocs.forEach((playerDoc, index) => {
+              if (playerDoc.exists()) {
+                  const currentBalance = playerDoc.data().balance || 0;
+                  const newBalance = currentBalance + entryFee;
+                  transaction.update(playerRefs[index], { balance: newBalance });
+              }
+          });
         }
         // Finally, delete the match document itself
         transaction.delete(matchRef);
@@ -398,7 +402,7 @@ export default function AdminPage() {
     { accessorKey: 'title', header: 'Title' },
     { accessorKey: 'entryFee', header: 'Fee (৳)' },
     { id: 'players', header: 'Players', cell: (info: any) => `${info.row.original.players.length} / ${info.row.original.type === '1v1' ? 2 : 8}` },
-    { accessorKey: 'status', header: 'Status' },
+    { id: 'status', header: 'Status', cell: (info: any) => <Badge variant="secondary" className="capitalize">{info.row.original.status}</Badge> },
     { id: 'winner', header: 'Winner', cell: (info: any) => info.row.original.winner?.username || 'N/A'},
     { id: 'actions', header: 'Actions', cell: (info: any) => {
         const m = info.row.original as Match;
@@ -455,7 +459,7 @@ export default function AdminPage() {
                             </div>
                             <DialogFooter>
                                 <div className="text-sm text-muted-foreground">
-                                    Match Status: <Badge variant="secondary">{m.status}</Badge>
+                                    Match Status: <Badge variant="secondary" className="capitalize">{m.status}</Badge>
                                 </div>
                             </DialogFooter>
                         </DialogContent>
@@ -573,5 +577,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    
