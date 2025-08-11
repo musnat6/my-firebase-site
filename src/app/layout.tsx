@@ -6,7 +6,7 @@ import { AuthProvider } from '@/hooks/use-auth.tsx';
 import { ThemeProvider } from '@/components/theme-provider';
 
 export const metadata: Metadata = {
-  title: 'Arena Clash',
+  title: 'Efootball clash',
   description: 'Efootball QuickMatch Arena',
 };
 
@@ -38,3 +38,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+    

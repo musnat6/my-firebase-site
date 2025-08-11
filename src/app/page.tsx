@@ -316,8 +316,8 @@ export default function DashboardPage() {
         <Sidebar>
           <SidebarHeader>
             <div className="flex items-center gap-3">
-              <Image src="/logo.svg" alt="Arena Clash" width={32} height={32} data-ai-hint="logo" />
-              <h1 className="text-xl font-headline font-bold">Arena Clash</h1>
+              <Image src="/logo.svg" alt="Efootball clash" width={32} height={32} data-ai-hint="logo" />
+              <h1 className="text-xl font-headline font-bold">Efootball clash</h1>
             </div>
           </SidebarHeader>
           <SidebarContent>
@@ -369,9 +369,11 @@ export default function DashboardPage() {
                 <CardDescription>Contact support for any issues.</CardDescription>
               </CardHeader>
               <CardContent className="p-4 pt-0">
-                <Button size="sm" className="w-full">
-                  Contact Support
-                </Button>
+                <a href="https://wa.me/8801860151497" target="_blank" rel="noopener noreferrer">
+                  <Button size="sm" className="w-full">
+                    Contact Support
+                  </Button>
+                </a>
               </CardContent>
             </Card>
           </SidebarFooter>
@@ -622,5 +624,7 @@ export default function DashboardPage() {
     </SidebarProvider>
   );
 }
+
+    
 
     

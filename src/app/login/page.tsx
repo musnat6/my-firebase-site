@@ -45,8 +45,8 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
         <div className="flex justify-center items-center gap-3 mb-4">
-            <Image src="/logo.svg" alt="Arena Clash" width={40} height={40} data-ai-hint="logo" />
-            <h1 className="text-3xl font-headline font-bold">Arena Clash</h1>
+            <Image src="/logo.svg" alt="Efootball clash" width={40} height={40} data-ai-hint="logo" />
+            <h1 className="text-3xl font-headline font-bold">Efootball clash</h1>
         </div>
           <CardTitle className="text-2xl font-headline">Login</CardTitle>
           <CardDescription>
@@ -93,3 +93,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+    
