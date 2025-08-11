@@ -4,7 +4,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db } from '@/lib/firebase';
 import type { Match, User, ResultSubmission, PlayerRef } from '@/types';
 import { useAuth } from '@/hooks/use-auth';
@@ -32,15 +31,6 @@ function ResultSubmissionCard({
 
     const playerSubmission = match.resultSubmissions?.[player.uid];
 
-    const fileToDataUri = (file: File): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    };
-
     const handleSubmitResult = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!selectedFile || !user || !match) return;
@@ -48,25 +38,34 @@ function ResultSubmissionCard({
         setIsSubmitting(true);
 
         try {
-            const photoDataUri = await fileToDataUri(selectedFile);
-            const storage = getStorage();
-            const screenshotRef = ref(storage, `match-results/${match.matchId}/${player.uid}_${Date.now()}`);
+            const formData = new FormData();
+            formData.append('image', selectedFile);
             
-            await uploadString(screenshotRef, photoDataUri, 'data_url');
-            const screenshotUrl = await getDownloadURL(screenshotRef);
-
-            const newSubmission: ResultSubmission = {
-                submittedBy: player.uid,
-                screenshotUrl,
-                submittedAt: Date.now(),
-            };
-            
-            const matchRef = doc(db, 'matches', match.matchId);
-            await updateDoc(matchRef, {
-                [`resultSubmissions.${player.uid}`]: newSubmission
+            const response = await fetch(`https://api.imgbb.com/1/upload?key=0d6a83905e89021c4c45331ba0263e81`, {
+                method: 'POST',
+                body: formData,
             });
 
-            toast({ title: 'Result Submitted', description: 'Your result has been submitted for admin review.', className: 'bg-green-600 text-white' });
+            const data = await response.json();
+
+            if (data.success) {
+                const screenshotUrl = data.data.url;
+
+                const newSubmission: ResultSubmission = {
+                    submittedBy: player.uid,
+                    screenshotUrl,
+                    submittedAt: Date.now(),
+                };
+                
+                const matchRef = doc(db, 'matches', match.matchId);
+                await updateDoc(matchRef, {
+                    [`resultSubmissions.${player.uid}`]: newSubmission
+                });
+
+                toast({ title: 'Result Submitted', description: 'Your result has been submitted for admin review.', className: 'bg-green-600 text-white' });
+            } else {
+                throw new Error(data.error?.message || 'Image upload failed.');
+            }
 
         } catch (error) {
             let errorMessage = "An unknown error occurred during submission.";
