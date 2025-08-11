@@ -31,11 +31,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
-<<<<<<< HEAD
   signUpWithEmail: (email: string, pass: string, username: string, efootballUsername: string, profilePic: string) => Promise<void>;
-=======
-  signUpWithEmail: (email: string, pass: string, username: string, profilePic: string) => Promise<void>;
->>>>>>> origin/main
   signOut: () => Promise<void>;
 }
 
@@ -72,11 +68,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => authUnsubscribe();
   }, [auth, db]);
 
-<<<<<<< HEAD
   const signUpWithEmail = async (email: string, password: string, username: string, efootballUsername: string, profilePic: string) => {
-=======
-  const signUpWithEmail = async (email: string, password: string, username: string, profilePic: string) => {
->>>>>>> origin/main
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
 
@@ -84,10 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       uid: firebaseUser.uid,
       email: firebaseUser.email!,
       username: username,
-<<<<<<< HEAD
       efootballUsername: efootballUsername,
-=======
->>>>>>> origin/main
       profilePic: profilePic,
       balance: 0,
       role: 'player',
@@ -128,8 +117,3 @@ export const useAuth = () => {
   }
   return context;
 };
-<<<<<<< HEAD
-=======
-
-    
->>>>>>> origin/main
