@@ -2,8 +2,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Match, User, ResultSubmission, PlayerRef } from '@/types';
 import { useAuth } from '@/hooks/use-auth';
@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { updateDoc } from 'firebase/firestore';
 
 function ResultSubmissionCard({ 
     match, 
@@ -144,6 +145,7 @@ function PlayerAvatar({ player }: { player: PlayerRef }) {
   const [playerData, setPlayerData] = useState<User | null>(null);
 
   useEffect(() => {
+    if (!player?.uid) return;
     const playerRef = doc(db, 'users', player.uid);
     const unsubscribe = onSnapshot(playerRef, (doc) => {
       if (doc.exists()) {
@@ -151,7 +153,7 @@ function PlayerAvatar({ player }: { player: PlayerRef }) {
       }
     });
     return () => unsubscribe();
-  }, [player.uid]);
+  }, [player?.uid]);
 
   const username = playerData?.username || player.username;
   const profilePic = playerData?.profilePic;
@@ -168,8 +170,8 @@ function PlayerAvatar({ player }: { player: PlayerRef }) {
 }
 
 
-export default function MatchDetailPage() {
-  const { matchId } = useParams();
+export default function MatchDetailPage({ params }: { params: { matchId: string } }) {
+  const { matchId } = params;
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
