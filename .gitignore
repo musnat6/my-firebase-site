@@ -13,9 +13,6 @@
 /.next/
 /out/
 
-# production
-/build
-
 # misc
 .DS_Store
 *.pem
@@ -28,8 +25,8 @@ yarn-error.log*
 # local env files
 .env.local
 .env.development.local
-.env.test.local
 .env.production.local
+.env.test.local
 
 # vercel
 .vercel
@@ -37,3 +34,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Firebase
+.firebase/
+database-debug.log
+firestore-debug.log
+storage-debug.log
+firebase-debug.log
+*.rules

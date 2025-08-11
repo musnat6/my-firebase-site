@@ -20,7 +20,10 @@ export default function ProfilePage() {
     const { toast } = useToast();
     
     const [username, setUsername] = useState('');
+<<<<<<< HEAD
     const [efootballUsername, setEfootballUsername] = useState('');
+=======
+>>>>>>> origin/main
     const [profilePic, setProfilePic] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [newProfilePicFile, setNewProfilePicFile] = useState<File | null>(null);
@@ -28,7 +31,10 @@ export default function ProfilePage() {
     useEffect(() => {
         if (user) {
             setUsername(user.username || '');
+<<<<<<< HEAD
             setEfootballUsername(user.efootballUsername || '');
+=======
+>>>>>>> origin/main
             setProfilePic(user.profilePic || '');
         }
     }, [user]);
@@ -42,6 +48,7 @@ export default function ProfilePage() {
     }
     
     const uploadProfilePicture = async (file: File): Promise<string> => {
+<<<<<<< HEAD
         const formData = new FormData();
         formData.append('image', file);
         
@@ -61,12 +68,37 @@ export default function ProfilePage() {
             return data.data.url;
         } else {
             throw new Error(data.error?.message || 'Image upload to ImgBB failed.');
+=======
+        setIsSubmitting(true);
+        try {
+            const formData = new FormData();
+            formData.append('image', file);
+            
+            const response = await fetch(`https://api.imgbb.com/1/upload?key=${process.env.NEXT_PUBLIC_IMGBB_API_KEY}`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                return data.data.url;
+            } else {
+                throw new Error(data.error?.message || 'Image upload to ImgBB failed.');
+            }
+        } finally {
+            setIsSubmitting(false);
+>>>>>>> origin/main
         }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+<<<<<<< HEAD
         if (!user || !username || !efootballUsername) return;
+=======
+        if (!user || !username) return;
+>>>>>>> origin/main
         setIsSubmitting(true);
 
         const userRef = doc(db, 'users', user.uid);
@@ -79,7 +111,10 @@ export default function ProfilePage() {
 
             await updateDoc(userRef, {
                 username: username,
+<<<<<<< HEAD
                 efootballUsername: efootballUsername,
+=======
+>>>>>>> origin/main
                 profilePic: newProfilePicUrl,
             });
             toast({
@@ -90,10 +125,16 @@ export default function ProfilePage() {
             setNewProfilePicFile(null); // Reset file input
         } catch (error) {
             console.error("Error updating profile:", error);
+<<<<<<< HEAD
             const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
             toast({
                 title: 'Update Failed',
                 description: errorMessage,
+=======
+            toast({
+                title: 'Update Failed',
+                description: (error as Error).message,
+>>>>>>> origin/main
                 variant: 'destructive'
             });
         } finally {
@@ -128,7 +169,11 @@ export default function ProfilePage() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Public Profile</CardTitle>
+<<<<<<< HEAD
                             <CardDescription>Update your profile details. Your eFootball username is crucial for verifying match results.</CardDescription>
+=======
+                            <CardDescription>Update your username and profile picture.</CardDescription>
+>>>>>>> origin/main
                         </CardHeader>
                         <CardContent className="space-y-6">
                              <div className="flex items-center gap-6">
@@ -137,13 +182,18 @@ export default function ProfilePage() {
                                     <AvatarFallback className="text-3xl">{username?.charAt(0).toUpperCase()}</AvatarFallback>
                                 </Avatar>
                                 <div className="grid gap-2 w-full">
+<<<<<<< HEAD
                                     <Label htmlFor="username">Site Username</Label>
+=======
+                                    <Label htmlFor="username">Username</Label>
+>>>>>>> origin/main
                                     <Input 
                                         id="username" 
                                         value={username} 
                                         onChange={(e) => setUsername(e.target.value)}
                                         required
                                     />
+<<<<<<< HEAD
                                      <p className="text-xs text-muted-foreground">Your display name on this website.</p>
                                 </div>
                             </div>
@@ -158,6 +208,10 @@ export default function ProfilePage() {
                                 />
                                  <p className="text-xs text-muted-foreground">Your exact in-game username. This is required for result verification.</p>
                             </div>
+=======
+                                </div>
+                            </div>
+>>>>>>> origin/main
 
                              <div className="grid gap-2">
                                 <Label htmlFor="profile-pic-upload">Upload New Profile Picture</Label>

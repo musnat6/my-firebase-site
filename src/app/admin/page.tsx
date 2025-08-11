@@ -45,7 +45,10 @@ import { AdminDataTable } from '@/components/admin-data-table';
 import { useAllUsers } from '@/hooks/use-all-users';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+<<<<<<< HEAD
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+=======
+>>>>>>> origin/main
 
 function SettingsTab() {
   const [settings, setSettings] = useState<PaymentSettings>({ number: '' });
@@ -391,8 +394,12 @@ export default function AdminPage() {
   ];
 
   const playersColumns = [
+<<<<<<< HEAD
     { accessorKey: 'username', header: 'Site Username' },
     { accessorKey: 'efootballUsername', header: 'Game Username' },
+=======
+    { accessorKey: 'username', header: 'Username' },
+>>>>>>> origin/main
     { accessorKey: 'email', header: 'Email' },
     { accessorKey: 'balance', header: 'Balance (৳)' },
     { id: 'wins', header: 'Wins', cell: (info: any) => info.row.original.stats?.wins ?? 0 },
@@ -507,6 +514,7 @@ export default function AdminPage() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Admin Responsibility</AlertTitle>
           <AlertDescription>
+<<<<<<< HEAD
             You are responsible for all manual transactions and match resolutions. Use player eFootball usernames to verify screenshot results. Declaring a match winner is final and will automatically transfer funds.
           </AlertDescription>
         </Alert>
@@ -579,6 +587,76 @@ export default function AdminPage() {
                     <SettingsTab />
                 </TabsContent>
             </div>
+=======
+            You are responsible for all manual transactions. Verify payments before approving deposits and send payments before approving withdrawals. Declaring a match winner is final and will automatically transfer funds. Deleting a match is permanent.
+          </AlertDescription>
+        </Alert>
+
+        <Tabs defaultValue="deposits" className="w-full">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-5">
+            <TabsTrigger value="deposits">Deposits</TabsTrigger>
+            <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
+            <TabsTrigger value="players">Players</TabsTrigger>
+            <TabsTrigger value="matches">Matches</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="deposits">
+            <AdminDataTable
+              columns={depositsColumns}
+              data={deposits}
+              loading={dataLoading}
+              title="Deposit Approvals"
+              description="Review and approve or decline manual bKash deposits."
+              searchColumn="username"
+              searchText="Search by username..."
+            />
+          </TabsContent>
+
+          <TabsContent value="withdrawals">
+            <AdminDataTable
+                columns={withdrawalsColumns}
+                data={withdrawals}
+                loading={dataLoading}
+                title="Withdrawal Approvals"
+                description="Review and process player withdrawal requests."
+                searchColumn="username"
+                searchText="Search by username..."
+              />
+          </TabsContent>
+
+          <TabsContent value="players">
+              <AdminDataTable
+                  columns={playersColumns}
+                  data={users}
+                  loading={usersLoading}
+                  title="Player Management"
+                  description="View and manage all registered players."
+                  searchColumn="username"
+                  searchText="Search by username..."
+                />
+          </TabsContent>
+
+          <TabsContent value="matches">
+              <AdminDataTable
+                  columns={matchesColumns}
+                  data={matches}
+                  loading={dataLoading}
+                  title="Match History"
+                  description="View all created matches."
+                  searchColumn="title"
+                  searchText="Search by title..."
+                />
+          </TabsContent>
+
+          <TabsContent value="disputes">
+              <DisputeSummarizer />
+          </TabsContent>
+
+          <TabsContent value="settings">
+              <SettingsTab />
+          </TabsContent>
+>>>>>>> origin/main
         </Tabs>
       </main>
     </div>

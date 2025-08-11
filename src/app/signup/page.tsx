@@ -22,7 +22,10 @@ export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+<<<<<<< HEAD
   const [efootballUsername, setEfootballUsername] = useState('');
+=======
+>>>>>>> origin/main
   // A default placeholder is assigned on signup. User can change it on their profile page.
   const defaultAvatar = 'https://placehold.co/128x128.png';
   const { signUpWithEmail } = useAuth();
@@ -40,8 +43,13 @@ export default function SignupPage() {
         return;
     }
     try {
+<<<<<<< HEAD
       await signUpWithEmail(email, password, username, efootballUsername, defaultAvatar);
       toast({ title: 'Sign Up Successful', description: "Welcome to Efootball clash! You can set your profile picture on the profile page." });
+=======
+      await signUpWithEmail(email, password, username, defaultAvatar);
+      toast({ title: 'Sign Up Successful', description: "Welcome to Arena Clash! You can set your profile picture on the profile page." });
+>>>>>>> origin/main
       router.push('/');
     } catch (error) {
       toast({
@@ -72,12 +80,17 @@ export default function SignupPage() {
               <Input
                 id="username"
                 type="text"
+<<<<<<< HEAD
                 placeholder="Your Gamer Tag on this site"
+=======
+                placeholder="Your Gamer Tag"
+>>>>>>> origin/main
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
               />
             </div>
+<<<<<<< HEAD
              <div className="grid gap-2">
               <Label htmlFor="efootball-username">eFootball Game Username</Label>
               <Input
@@ -89,6 +102,8 @@ export default function SignupPage() {
                 onChange={(e) => setEfootballUsername(e.target.value)}
               />
             </div>
+=======
+>>>>>>> origin/main
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -125,3 +140,8 @@ export default function SignupPage() {
     </div>
   );
 }
+<<<<<<< HEAD
+=======
+
+    
+>>>>>>> origin/main
