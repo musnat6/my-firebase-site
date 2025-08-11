@@ -11,17 +11,13 @@ import {
 import {
   Auth,
   getAuth,
-  GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  signInWithPopup,
   signOut as firebaseSignOut,
-  User as FirebaseUser,
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
 import {
   doc,
-  getDoc,
   getFirestore,
   Firestore,
   setDoc,
@@ -30,13 +26,13 @@ import {
 
 import { app } from '@/lib/firebase';
 import type { User } from '@/types';
+import { generateIconDataUri } from '@/lib/icon-generator.tsx';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (email: string, pass: string, username: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -56,20 +52,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userUnsubscribe = onSnapshot(userDocRef, async (userDoc) => {
           if (userDoc.exists()) {
             setUser({ uid: firebaseUser.uid, ...userDoc.data() } as User);
-          } else {
-            // If user exists in auth but not firestore, create them
-             const newUser: User = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email!,
-              username: firebaseUser.displayName || 'New User',
-              profilePic: firebaseUser.photoURL || `https://placehold.co/100x100`,
-              balance: 0,
-              role: 'player',
-              stats: { wins: 0, losses: 0, earnings: 0 },
-            };
-            await setDoc(userDocRef, newUser);
-            // Firestore listener will pick up the new user doc and set state
           }
+          // The creation of the user document is now handled exclusively in the signUpWithEmail function
+          // This prevents issues where an auth record might exist without a username during sign-up.
           setLoading(false);
         });
 
@@ -87,44 +72,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUpWithEmail = async (email: string, password: string, username: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const firebaseUser = userCredential.user;
+    
+    // Generate a unique, colorful SVG icon for the new user.
+    const profilePic = generateIconDataUri(username);
+
     const newUser: User = {
       uid: firebaseUser.uid,
       email: firebaseUser.email!,
-      username: username,
-      profilePic: `https://placehold.co/100x100`,
+      username: username, // Use the provided username
+      profilePic: profilePic, // Use the generated icon
       balance: 0,
       role: 'player',
       stats: { wins: 0, losses: 0, earnings: 0 },
     };
     await setDoc(doc(db, "users", firebaseUser.uid), newUser);
-    // setUser is handled by the onSnapshot listener
+    // The onSnapshot listener will automatically pick up the new user document and set the state.
   };
 
   const signInWithEmail = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
-  };
-
-  const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    const firebaseUser = result.user;
-
-    const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const userDoc = await getDoc(userDocRef);
-
-    if (!userDoc.exists()) {
-       const newUser: User = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email!,
-        username: firebaseUser.displayName || 'New User',
-        profilePic: firebaseUser.photoURL || `https://placehold.co/100x100`,
-        balance: 0,
-        role: 'player',
-        stats: { wins: 0, losses: 0, earnings: 0 },
-      };
-      await setDoc(userDocRef, newUser);
-    }
-    // setUser is handled by the onSnapshot listener
   };
 
   const signOut = async () => {
@@ -137,7 +103,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     loading,
     signInWithEmail,
     signUpWithEmail,
-    signInWithGoogle,
     signOut,
   };
 

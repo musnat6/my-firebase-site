@@ -15,14 +15,13 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { Chrome } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { signInWithEmail, signInWithGoogle } = useAuth();
+  const { signInWithEmail } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -36,20 +35,6 @@ export default function LoginPage() {
       toast({
         variant: 'destructive',
         title: 'Login Failed',
-        description: (error as Error).message,
-      });
-    }
-  };
-  
-  const handleGoogleSignIn = async () => {
-    try {
-      await signInWithGoogle();
-      toast({ title: 'Login Successful', description: 'Welcome!' });
-      router.push('/');
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Google Sign-In Failed',
         description: (error as Error).message,
       });
     }
@@ -97,20 +82,6 @@ export default function LoginPage() {
               Login
             </Button>
           </form>
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with
-              </span>
-            </div>
-          </div>
-          <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
-            <Chrome className="mr-2 h-4 w-4" />
-            Login with Google
-          </Button>
           <div className="mt-4 text-center text-sm">
             Don&apos;t have an account?{' '}
             <Link href="/signup" className="underline">
