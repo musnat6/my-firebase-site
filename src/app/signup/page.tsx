@@ -17,14 +17,13 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { AvatarSelector } from '@/components/avatar-selector';
-import { avatars } from '@/lib/avatars';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
-  const [selectedAvatar, setSelectedAvatar] = useState(avatars[0].src);
+  // A default placeholder is assigned on signup. User can change it on their profile page.
+  const defaultAvatar = 'https://placehold.co/128x128.png';
   const { signUpWithEmail } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
@@ -40,8 +39,8 @@ export default function SignupPage() {
         return;
     }
     try {
-      await signUpWithEmail(email, password, username, selectedAvatar);
-      toast({ title: 'Sign Up Successful', description: "Welcome to Arena Clash!" });
+      await signUpWithEmail(email, password, username, defaultAvatar);
+      toast({ title: 'Sign Up Successful', description: "Welcome to Arena Clash! You can set your profile picture on the profile page." });
       router.push('/');
     } catch (error) {
       toast({
@@ -62,16 +61,12 @@ export default function SignupPage() {
             </div>
           <CardTitle className="text-2xl font-headline">Create an Account</CardTitle>
           <CardDescription>
-            Choose your avatar and username to start playing.
+            Enter your details to start playing.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignup} className="grid gap-4">
-            <div className="grid gap-2">
-                <Label>Choose Your Avatar</Label>
-                <AvatarSelector selectedAvatar={selectedAvatar} onSelectAvatar={setSelectedAvatar} />
-            </div>
-            <div className="grid gap-2">
+             <div className="grid gap-2">
               <Label htmlFor="username">Username</Label>
               <Input
                 id="username"

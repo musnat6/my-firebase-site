@@ -3,7 +3,7 @@
 
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
-import { Home, Loader2 } from 'lucide-react';
+import { Home, Loader2, Upload } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/use-auth';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,6 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { AvatarSelector } from '@/components/avatar-selector';
 
 export default function ProfilePage() {
     const router = useRouter();
@@ -23,6 +22,7 @@ export default function ProfilePage() {
     const [username, setUsername] = useState('');
     const [profilePic, setProfilePic] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [newProfilePicFile, setNewProfilePicFile] = useState<File | null>(null);
 
     useEffect(() => {
         if (user) {
@@ -39,6 +39,31 @@ export default function ProfilePage() {
         );
     }
     
+    const uploadProfilePicture = async (file: File): Promise<string> => {
+        setIsSubmitting(true);
+        try {
+            const formData = new FormData();
+            formData.append('image', file);
+            
+            // NOTE: The API key is hardcoded here as requested in the prompt. 
+            // In a real-world scenario, this should be in an environment variable.
+            const response = await fetch(`https://api.imgbb.com/1/upload?key=0d6a83905e89021c4c45331ba0263e81`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                return data.data.url;
+            } else {
+                throw new Error(data.error?.message || 'Image upload to ImgBB failed.');
+            }
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user || !username) return;
@@ -46,15 +71,22 @@ export default function ProfilePage() {
 
         const userRef = doc(db, 'users', user.uid);
         try {
+            let newProfilePicUrl = profilePic;
+            if (newProfilePicFile) {
+                newProfilePicUrl = await uploadProfilePicture(newProfilePicFile);
+                setProfilePic(newProfilePicUrl); // Update local state to show new image
+            }
+
             await updateDoc(userRef, {
                 username: username,
-                profilePic: profilePic
+                profilePic: newProfilePicUrl,
             });
             toast({
                 title: 'Profile Updated',
                 description: 'Your changes have been saved.',
                 className: 'bg-green-600 text-white'
             });
+            setNewProfilePicFile(null); // Reset file input
         } catch (error) {
             console.error("Error updating profile:", error);
             toast({
@@ -67,6 +99,18 @@ export default function ProfilePage() {
         }
     };
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setNewProfilePicFile(file);
+            // Show a preview of the new image
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setProfilePic(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
 
     return (
         <div className="flex min-h-screen w-full flex-col bg-muted/40">
@@ -85,7 +129,7 @@ export default function ProfilePage() {
                             <CardDescription>Update your username and profile picture.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            <div className="flex items-center gap-6">
+                             <div className="flex items-center gap-6">
                                 <Avatar className="h-24 w-24">
                                     <AvatarImage src={profilePic} alt={username} />
                                     <AvatarFallback className="text-3xl">{username?.charAt(0).toUpperCase()}</AvatarFallback>
@@ -102,9 +146,16 @@ export default function ProfilePage() {
                             </div>
 
                              <div className="grid gap-2">
-                                <Label>Choose Your Avatar</Label>
-                                <AvatarSelector selectedAvatar={profilePic} onSelectAvatar={setProfilePic} />
+                                <Label htmlFor="profile-pic-upload">Upload New Profile Picture</Label>
+                                <Input 
+                                    id="profile-pic-upload"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleFileChange}
+                                />
+                                <p className="text-xs text-muted-foreground">Choose a new image to update your profile picture.</p>
                             </div>
+
 
                             <div className="grid gap-2">
                                 <Label htmlFor="email">Email</Label>
