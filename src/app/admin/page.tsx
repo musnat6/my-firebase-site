@@ -227,6 +227,7 @@ export default function AdminPage() {
     setIsSubmitting(prev => ({ ...prev, [submittingKey]: true }));
 
     const matchRef = doc(db, 'matches', matchId);
+    let winnerPrize = 0; // Declare winnerPrize in the outer scope
 
     try {
         await runTransaction(db, async (transaction) => {
@@ -243,7 +244,7 @@ export default function AdminPage() {
             // --- 2. CALCULATION PHASE ---
             const prizePool = entryFee * players.length;
             const commission = prizePool * 0.10; // 10% commission
-            const winnerPrize = prizePool - commission;
+            winnerPrize = prizePool - commission; // Assign value to the outer scope variable
 
             const currentBalance = winnerDoc.data().balance || 0;
             const newBalance = currentBalance + winnerPrize;
