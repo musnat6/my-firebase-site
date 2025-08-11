@@ -16,13 +16,8 @@ export function useUserMatches(userId?: string) {
         // Query for matches where the user is a player
         q = query(
             collection(db, 'matches'), 
-            where('players', 'array-contains', { uid: userId, username: 'dummy', profilePic: 'dummy' }), // dummy values needed for object match
             orderBy('createdAt', 'desc')
         );
-         // The above is a simplification because Firestore can't query partial objects in an array.
-         // A more robust solution for production would involve a subcollection or duplicating player uids in a simple array.
-         // For this project, we'll fetch all and filter client-side if a specific user is requested.
-         q = query(collection(db, 'matches'), orderBy('createdAt', 'desc'));
 
     } else {
         // Fetch all matches if no user ID is provided
@@ -53,3 +48,5 @@ export function useUserMatches(userId?: string) {
 
   return { matches, loading };
 }
+
+    

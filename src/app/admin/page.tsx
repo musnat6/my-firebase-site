@@ -351,7 +351,7 @@ export default function AdminPage() {
       case 'pending':
         return <Badge variant="secondary"><Clock className="mr-1 h-3 w-3" />Pending</Badge>;
       case 'approved':
-        return <Badge variant="default" className="bg-green-600 hover:bg-green-700"><CheckCircle className="mr-1 h-3 w-3" />Approved</Badge>;
+        return <Badge className="bg-green-600 hover:bg-green-700"><CheckCircle className="mr-1 h-3 w-3" />Approved</Badge>;
       case 'declined':
         return <Badge variant="destructive"><AlertTriangle className="mr-1 h-3 w-3" />Declined</Badge>;
     }
@@ -509,8 +509,8 @@ export default function AdminPage() {
           </AlertDescription>
         </Alert>
 
-        <Tabs defaultValue="deposits">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+        <Tabs defaultValue="deposits" className="w-full">
+          <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-5">
             <TabsTrigger value="deposits">Deposits</TabsTrigger>
             <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
             <TabsTrigger value="players">Players</TabsTrigger>
@@ -578,3 +578,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    

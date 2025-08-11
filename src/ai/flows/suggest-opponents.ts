@@ -2,28 +2,23 @@
 
 /**
  * @fileOverview This file defines a Genkit flow to suggest possible opponents
- * based on a player's win/loss ratio.
+ * based on a player's win/loss ratio and a provided list of active players.
  *
  * - suggestOpponents - A function that suggests opponents for a player.
  * - SuggestOpponentsInput - The input type for the suggestOpponents function.
  * - SuggestOpponentsOutput - The return type for the suggestOpponents function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
+import { UserSchema } from '@/types/zod';
 
 const SuggestOpponentsInputSchema = z.object({
   userId: z.string().describe('The ID of the player requesting opponent suggestions.'),
-  winLossRatio: z
-    .number()
-    .describe('The win/loss ratio of the player (wins / losses).'),
-  gameType: z
-    .string()
-    .describe('The type of game the player wants to play (e.g., "1v1", "Mini Tournament").'),
-  numOpponents: z
-    .number()
-    .default(3)
-    .describe('The number of opponents to suggest (default: 3).'),
+  winLossRatio: z.number().describe('The win/loss ratio of the player (wins / losses).'),
+  gameType: z.string().describe('The type of game the player wants to play (e.g., "1v1", "Mini Tournament").'),
+  numOpponents: z.number().default(3).describe('The number of opponents to suggest (default: 3).'),
+  activePlayers: z.array(UserSchema).describe("A list of currently active players to choose from."),
 });
 export type SuggestOpponentsInput = z.infer<typeof SuggestOpponentsInputSchema>;
 
@@ -48,35 +43,24 @@ export async function suggestOpponents(input: SuggestOpponentsInput): Promise<Su
 
 const prompt = ai.definePrompt({
   name: 'suggestOpponentsPrompt',
-  input: {schema: SuggestOpponentsInputSchema},
-  output: {schema: SuggestOpponentsOutputSchema},
+  input: { schema: SuggestOpponentsInputSchema },
+  output: { schema: SuggestOpponentsOutputSchema },
   prompt: `You are an AI that suggests potential opponents for a player in an online gaming platform.
 
 The player has a win/loss ratio of {{winLossRatio}} and wants to play a game of type {{gameType}}.
 
-Suggest {{numOpponents}} opponents with similar win/loss ratios to provide a challenging and fair match.
+From the following list of active players, suggest {{numOpponents}} opponents with similar win/loss ratios to provide a challenging and fair match.
+
+Prioritize players whose win/loss ratio is closest to the requesting player's ratio.
+
+Available Active Players:
+\`\`\`json
+{{{json activePlayers}}}
+\`\`\`
 
 Output the suggestions as a JSON array of opponents, including their userId, username, and winLossRatio.
 Make sure that all opponents in the list are valid and active players in the system.
 
-[Example Output]
-[
-  {
-    "userId": "player123",
-    "username": "GameMaster",
-    "winLossRatio": 1.2
-  },
-  {
-    "userId": "player456",
-    "username": "ProGamer90",
-    "winLossRatio": 0.9
-  },
-  {
-    "userId": "player789",
-    "username": "NoobSlayer",
-    "winLossRatio": 1.1
-  }
-]
 `,
 });
 
@@ -86,8 +70,16 @@ const suggestOpponentsFlow = ai.defineFlow(
     inputSchema: SuggestOpponentsInputSchema,
     outputSchema: SuggestOpponentsOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
+  async (input) => {
+    // Transform activePlayers to include their winLossRatio for the prompt
+    const playersWithRatio = input.activePlayers.map(p => ({
+        ...p,
+        winLossRatio: p.stats.losses > 0 ? p.stats.wins / p.stats.losses : p.stats.wins,
+    }));
+  
+    const { output } = await prompt({ ...input, activePlayers: playersWithRatio });
     return output!;
   }
 );
+
+    

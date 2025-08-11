@@ -51,6 +51,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MatchCard } from '@/components/match-card';
 import { UserNav } from '@/components/user-nav';
@@ -58,14 +59,15 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { addDoc, collection, doc, onSnapshot, runTransaction } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot, runTransaction, serverTimestamp, getDocs, writeBatch, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { LeaderboardTable } from '@/components/leaderboard-table';
 import { useUserMatches } from '@/hooks/use-user-matches';
 import { suggestOpponents, SuggestOpponentsOutput } from '@/ai/flows/suggest-opponents';
 import { generateMatchDescription } from '@/ai/flows/generate-match-description';
 import { Textarea } from '@/components/ui/textarea';
-import type { PaymentSettings, User } from '@/types';
+import type { PaymentSettings, User, AppNotification } from '@/types';
+import { formatDistanceToNow } from 'date-fns';
 
 
 export default function DashboardPage() {
@@ -79,6 +81,10 @@ export default function DashboardPage() {
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>({ number: 'Loading...' });
   const [hasCopied, setHasCopied] = useState(false);
+
+  // Notification states
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Form states
   const [depositAmount, setDepositAmount] = useState('');
@@ -109,6 +115,50 @@ export default function DashboardPage() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Effect for listening to notifications
+  useEffect(() => {
+    if (!user) return;
+    
+    const notificationsQuery = query(
+        collection(db, 'notifications'),
+        orderBy('createdAt', 'desc'),
+        limit(10)
+    );
+
+    const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
+        const newNotifications = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as AppNotification));
+        setNotifications(newNotifications);
+        
+        const newUnreadCount = newNotifications.filter(n => !n.readBy.includes(user.uid)).length;
+        setUnreadCount(newUnreadCount);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleMarkNotificationsRead = async () => {
+    if (!user || unreadCount === 0) return;
+    
+    const batch = writeBatch(db);
+    const notificationsToUpdate = notifications.filter(n => !n.readBy.includes(user.uid));
+
+    notificationsToUpdate.forEach(notification => {
+        const notifRef = doc(db, 'notifications', notification.id);
+        const updatedReadBy = [...notification.readBy, user.uid];
+        batch.update(notifRef, { readBy: updatedReadBy });
+    });
+
+    try {
+        await batch.commit();
+        setUnreadCount(0);
+    } catch (error) {
+        console.error("Error marking notifications as read:", error);
+    }
+};
 
   useEffect(() => {
     if (user && withdrawAmount) {
@@ -173,11 +223,17 @@ export default function DashboardPage() {
       setIsSuggesting(true);
       try {
         const winLossRatio = user.stats.losses > 0 ? user.stats.wins / user.stats.losses : user.stats.wins;
+        // Fetch recent users to pass to the flow
+        const usersQuery = query(collection(db, 'users'), where('uid', '!=', user.uid), limit(20));
+        const usersSnapshot = await getDocs(usersQuery);
+        const activePlayers = usersSnapshot.docs.map(doc => doc.data() as User);
+        
         const suggestions = await suggestOpponents({
           userId: user.uid,
           winLossRatio: winLossRatio,
           gameType: '1v1', // Or make this selectable
-          numOpponents: 3
+          numOpponents: 3,
+          activePlayers: activePlayers,
         });
         setOpponentSuggestions(suggestions);
       } catch (error) {
@@ -217,7 +273,7 @@ export default function DashboardPage() {
           amount: Number(depositAmount),
           txId: depositTxId,
           status: 'pending',
-          timestamp: Date.now(),
+          timestamp: serverTimestamp(),
         });
       } else if (openDialog === 'withdraw') {
         const amountToWithdraw = Number(withdrawAmount);
@@ -245,7 +301,7 @@ export default function DashboardPage() {
                 amount: amountToWithdraw,
                 bkashNumber: withdrawBkash,
                 status: 'pending',
-                timestamp: Date.now(),
+                timestamp: serverTimestamp(),
             });
         });
 
@@ -253,6 +309,7 @@ export default function DashboardPage() {
         const entryFeeNumber = Number(entryFee);
         const userRef = doc(db, 'users', user.uid);
         
+        let newMatchId = '';
         await runTransaction(db, async (transaction) => {
             const userDoc = await transaction.get(userRef);
             if (!userDoc.exists()) {
@@ -268,18 +325,33 @@ export default function DashboardPage() {
             transaction.update(userRef, { balance: newBalance });
 
             // Create match
-            const matchesRef = collection(db, 'matches');
-            transaction.set(doc(matchesRef), {
+            const newMatchRef = doc(collection(db, 'matches'));
+            newMatchId = newMatchRef.id;
+            transaction.set(newMatchRef, {
                 title: matchTitle,
                 description: matchDescription,
                 entryFee: entryFeeNumber,
                 type: '1v1',
                 status: 'open',
                 players: [{ uid: user.uid, username: user.username, profilePic: user.profilePic }],
-                createdAt: Date.now(),
+                createdAt: serverTimestamp(),
                 resultSubmissions: {},
             });
         });
+
+         // Create notification after match is created successfully
+        if (newMatchId) {
+          const notificationRef = doc(collection(db, 'notifications'));
+          await setDoc(notificationRef, {
+            message: `${user.username} created a new match: "${matchTitle}"`,
+            type: 'new_match',
+            matchId: newMatchId,
+            createdAt: serverTimestamp(),
+            readBy: [user.uid], // Creator has "read" it by default
+            creatorId: user.uid,
+            creatorUsername: user.username,
+          });
+        }
       }
 
       toast({
@@ -305,6 +377,7 @@ export default function DashboardPage() {
   };
 
   const copyToClipboard = () => {
+    if(!paymentSettings.number) return;
     navigator.clipboard.writeText(paymentSettings.number);
     setHasCopied(true);
     setTimeout(() => setHasCopied(false), 2000);
@@ -388,10 +461,49 @@ export default function DashboardPage() {
               </h1>
             </div>
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" className="rounded-full">
-                <Bell className="h-5 w-5" />
-                <span className="sr-only">Notifications</span>
-              </Button>
+              <Popover onOpenChange={(open) => {
+                if(!open && unreadCount > 0) {
+                  handleMarkNotificationsRead();
+                }
+              }}>
+                <PopoverTrigger asChild>
+                   <Button variant="ghost" size="icon" className="rounded-full relative">
+                    <Bell className="h-5 w-5" />
+                    {unreadCount > 0 && <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500"></span>}
+                    <span className="sr-only">Notifications</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="end">
+                    <div className="grid gap-4">
+                      <div className="space-y-2">
+                        <h4 className="font-medium leading-none">Notifications</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Recent activity from around the platform.
+                        </p>
+                      </div>
+                      <div className="grid gap-2">
+                        {notifications.length > 0 ? (
+                           notifications.map((notification) => (
+                              <div
+                                key={notification.id}
+                                className="grid grid-cols-[25px_1fr] items-start pb-4 last:mb-0 last:pb-0"
+                              >
+                                {!notification.readBy.includes(user.uid) && <span className="flex h-2 w-2 translate-y-1 rounded-full bg-sky-500" />}
+                                <div className={`col-start-2 grid gap-1 ${!notification.readBy.includes(user.uid) ? '' : 'pl-[25px]'}`}>
+                                  <p className="text-sm font-medium">{notification.message}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {formatDistanceToNow(notification.createdAt.toDate(), { addSuffix: true })}
+                                  </p>
+                                </div>
+                              </div>
+                            ))
+                        ) : (
+                          <p className="text-sm text-center text-muted-foreground">No new notifications.</p>
+                        )}
+                      </div>
+                    </div>
+                </PopoverContent>
+              </Popover>
               <UserNav />
             </div>
           </header>
@@ -624,7 +736,5 @@ export default function DashboardPage() {
     </SidebarProvider>
   );
 }
-
-    
 
     

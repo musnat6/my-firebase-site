@@ -1,4 +1,6 @@
 
+import { Timestamp } from "firebase/firestore";
+
 export interface PlayerRef {
     uid: string;
     username: string;
@@ -39,7 +41,7 @@ export interface Match {
     reportedBy: string;
     reason: string;
   };
-  createdAt: number; // timestamp
+  createdAt: Timestamp;
 }
 
 
@@ -60,7 +62,7 @@ export interface Deposit {
   amount: number;
   txId: string;
   status: 'pending' | 'approved' | 'declined';
-  timestamp: number;
+  timestamp: Timestamp;
   handledBy?: string;
 }
 
@@ -71,12 +73,23 @@ export interface Withdrawal {
   amount: number;
   bkashNumber: string;
   status: 'pending' | 'approved' | 'declined';
-  timestamp: number;
+  timestamp: Timestamp;
   handledBy?: string;
 }
 
 export interface PaymentSettings {
   number: string;
+}
+
+export interface AppNotification {
+    id: string;
+    message: string;
+    type: 'new_match' | 'dispute' | 'general';
+    matchId?: string;
+    createdAt: Timestamp;
+    readBy: string[]; // Array of user UIDs who have read the notification
+    creatorId: string;
+    creatorUsername: string;
 }
 
     
