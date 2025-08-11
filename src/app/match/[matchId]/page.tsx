@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -154,7 +154,7 @@ function PlayerAvatar({ player }: { player: PlayerRef }) {
   }, [player.uid]);
 
   const username = playerData?.username || player.username;
-  const profilePic = playerData?.profilePic || player.profilePic;
+  const profilePic = playerData?.profilePic;
 
   return (
     <div className="flex flex-col items-center gap-2 relative">
