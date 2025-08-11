@@ -45,7 +45,7 @@ export default function ProfilePage() {
             const formData = new FormData();
             formData.append('image', file);
             
-            const response = await fetch(`https://api.imgbb.com/1/upload?key=0d6a83905e89021c4c45331ba0263e81`, {
+            const response = await fetch(`https://api.imgbb.com/1/upload?key=${process.env.NEXT_PUBLIC_IMGBB_API_KEY}`, {
                 method: 'POST',
                 body: formData,
             });
