@@ -12,6 +12,7 @@ import { db } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { GeneratedMatchIcon } from "./generated-match-icon";
 
 interface MatchCardProps {
   match: Match
@@ -99,17 +100,6 @@ export function MatchCard({ match }: MatchCardProps) {
   const userIsInMatch = user && match.players.some(p => p.uid === user.uid);
   const isFull = match.players.length >= (match.type === '1v1' ? 2 : 8);
 
-  const getIcon = () => {
-    switch (match.type) {
-        case '1v1':
-            return <Swords className="h-12 w-12 text-primary/80" />;
-        case 'Mini Tournament':
-            return <Trophy className="h-12 w-12 text-primary/80" />;
-        default:
-            return <Gamepad2 className="h-12 w-12 text-primary/80" />;
-    }
-  }
-  
   const handleCardClick = () => {
     router.push(`/match/${match.matchId}`);
   };
@@ -119,8 +109,8 @@ export function MatchCard({ match }: MatchCardProps) {
         className="flex flex-col h-full hover:shadow-accent/20 hover:shadow-lg transition-shadow duration-300 overflow-hidden bg-card cursor-pointer"
         onClick={handleCardClick}
     >
-        <div className="aspect-video bg-muted/50 flex items-center justify-center">
-            {getIcon()}
+        <div className="aspect-video bg-muted/50 flex items-center justify-center p-4">
+            <GeneratedMatchIcon seed={match.title} className="h-24 w-24" />
         </div>
       <CardHeader>
         <div className="flex justify-between items-start">
