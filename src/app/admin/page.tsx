@@ -454,7 +454,9 @@ export default function AdminPage() {
                                 })}
                             </div>
                             <DialogFooter>
-                                <p className="text-sm text-muted-foreground">Match Status: <Badge variant="secondary">{m.status}</Badge></p>
+                                <div className="text-sm text-muted-foreground">
+                                    Match Status: <Badge variant="secondary">{m.status}</Badge>
+                                </div>
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
@@ -571,3 +573,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
