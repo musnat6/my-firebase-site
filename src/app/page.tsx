@@ -59,7 +59,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { addDoc, collection, doc, onSnapshot, runTransaction, serverTimestamp, getDocs, writeBatch, query, where, orderBy, limit } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot, runTransaction, serverTimestamp, getDocs, writeBatch, query, where, orderBy, limit, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { LeaderboardTable } from '@/components/leaderboard-table';
 import { useUserMatches } from '@/hooks/use-user-matches';
@@ -442,7 +442,7 @@ export default function DashboardPage() {
                 <CardDescription>Contact support for any issues.</CardDescription>
               </CardHeader>
               <CardContent className="p-4 pt-0">
-                <a href="https://wa.me/8801860151497" target="_blank" rel="noopener noreferrer">
+                <a href="https://wa.me/01860151497" target="_blank" rel="noopener noreferrer">
                   <Button size="sm" className="w-full">
                     Contact Support
                   </Button>
@@ -627,9 +627,9 @@ export default function DashboardPage() {
                         <Alert>
                             <AlertTitle className="font-bold">Payment Instructions</AlertTitle>
                             <AlertDescription>
-                                1. Send your payment to the bKash number below.
+                                1. Only use the bKash "Send Money" option to the number below.
                                 <br/>
-                                2. Enter the amount and the Transaction ID (TrxID).
+                                2. Enter the amount you sent and the Transaction ID (TrxID).
                             </AlertDescription>
                         </Alert>
                         <div className="grid gap-2">
@@ -736,5 +736,3 @@ export default function DashboardPage() {
     </SidebarProvider>
   );
 }
-
-    
